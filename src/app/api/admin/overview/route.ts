@@ -1,0 +1,184 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+
+// GET - Fetch admin dashboard overview
+export async function GET(request: NextRequest) {
+  try {
+    // Get current date info
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+    // Parallel fetch all stats
+    const [
+      totalUsers,
+      totalBusinesses,
+      totalBookings,
+      totalRevenue,
+      monthlyRevenue,
+      lastMonthRevenue,
+      pendingApplications,
+      pendingReports,
+      openDisputes,
+      activeListings,
+      pendingTickets,
+      pendingClaims,
+      pendingAds,
+      recentPayments,
+      settings,
+    ] = await Promise.all([
+      // Total users
+      db.user.count(),
+      
+      // Total businesses
+      db.business.count(),
+      
+      // Total bookings
+      db.booking.count(),
+      
+      // Total revenue
+      db.payment.aggregate({
+        where: { status: 'COMPLETED' },
+        _sum: { amount: true },
+      }),
+      
+      // Monthly revenue
+      db.payment.aggregate({
+        where: {
+          status: 'COMPLETED',
+          createdAt: { gte: startOfMonth },
+        },
+        _sum: { amount: true },
+      }),
+      
+      // Last month revenue
+      db.payment.aggregate({
+        where: {
+          status: 'COMPLETED',
+          createdAt: { gte: startOfLastMonth, lte: endOfLastMonth },
+        },
+        _sum: { amount: true },
+      }),
+      
+      // Pending business applications
+      db.business.count({ where: { verificationStatus: 'PENDING' } }),
+      
+      // Pending reports
+      db.adminReport.count({ where: { status: 'PENDING' } }),
+      
+      // Open disputes
+      db.dispute.count({ where: { status: 'OPEN' } }),
+      
+      // Active premium listings
+      db.premiumListing.count({ where: { status: 'ACTIVE' } }),
+      
+      // Pending support tickets
+      db.supportTicket.count({ where: { status: 'OPEN' } }),
+      
+      // Pending insurance claims
+      db.insuranceClaim.count({ where: { status: { in: ['SUBMITTED', 'UNDER_REVIEW'] } } }),
+      
+      // Pending advertisements
+      db.advertisement.count({ where: { status: 'PENDING' } }),
+      
+      // Recent payments
+      db.payment.findMany({
+        where: { status: 'COMPLETED' },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        include: {
+          user: {
+            select: { name: true, email: true },
+          },
+          booking: {
+            select: { 
+              business: { select: { name: true } },
+            },
+          },
+        },
+      }),
+      
+      // Platform settings
+      db.platformSetting.findFirst(),
+    ]);
+
+    // Calculate growth percentage
+    const currentRevenue = monthlyRevenue._sum.amount || 0;
+    const previousRevenue = lastMonthRevenue._sum.amount || 0;
+    const revenueGrowth = previousRevenue > 0 
+      ? ((currentRevenue - previousRevenue) / previousRevenue) * 100 
+      : 0;
+
+    // Get monthly revenue data for the last 6 months
+    const monthlyData = [];
+    for (let i = 5; i >= 0; i--) {
+      const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+      
+      const monthRevenue = await db.payment.aggregate({
+        where: {
+          status: 'COMPLETED',
+          createdAt: { gte: monthStart, lte: monthEnd },
+        },
+        _sum: { amount: true },
+      });
+
+      monthlyData.push({
+        month: monthStart.toLocaleDateString('en-US', { month: 'short' }),
+        revenue: monthRevenue._sum.amount || 0,
+      });
+    }
+
+    // Calculate commissions (platform fee)
+    const platformFee = settings?.platformFee || 15;
+    const totalCommissions = Math.round((totalRevenue._sum.amount || 0) * (platformFee / 100));
+
+    return NextResponse.json({
+      overview: {
+        totalUsers,
+        totalBusinesses,
+        totalBookings,
+        totalRevenue: totalRevenue._sum.amount || 0,
+        totalCommissions,
+        revenueGrowth: Math.round(revenueGrowth * 10) / 10,
+      },
+      monthly: {
+        revenue: currentRevenue,
+        commissions: Math.round(currentRevenue * (platformFee / 100)),
+        bookings: await db.booking.count({
+          where: { createdAt: { gte: startOfMonth } },
+        }),
+      },
+      pending: {
+        applications: pendingApplications,
+        reports: pendingReports,
+        disputes: openDisputes,
+        listings: await db.premiumListing.count({ where: { status: 'PENDING' } }),
+        tickets: pendingTickets,
+        claims: pendingClaims,
+        ads: pendingAds,
+      },
+      revenueChart: monthlyData,
+      recentPayments: recentPayments.map(p => ({
+        id: p.id,
+        amount: p.amount,
+        createdAt: p.createdAt,
+        customerName: p.user?.name || 'Unknown',
+        businessName: p.booking?.business?.name || 'N/A',
+      })),
+      settings: settings || {
+        platformFee: 15,
+        minWithdrawal: 50,
+        featuredListingPrice: 99,
+        premiumListingPrice: 49,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching admin overview:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch admin overview' },
+      { status: 500 }
+    );
+  }
+}

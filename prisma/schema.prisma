@@ -1,0 +1,1021 @@
+// GroomConnect Database Schema
+// Multi-tenant grooming marketplace
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x", "debian-openssl-3.0.x", "linux-arm64-openssl-3.0.x", "darwin-arm64"]
+}
+
+datasource db {
+  provider  = "sqlite"
+  url       = env("DATABASE_URL")
+}
+
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  phone         String?   @unique
+  password      String?
+  name          String?
+  avatar        String?
+  role          UserRole  @default(CUSTOMER)
+  emailVerified DateTime?
+  phoneVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  business            Business?
+  bookings            Booking[]
+  payments            Payment[]
+  notifications       Notification[]
+  reviews             Review[]
+  favorites           Favorite[]
+  sentMessages        ChatMessage[]  @relation("SenderMessages")
+  receivedMessages    ChatMessage[]  @relation("ReceiverMessages")
+  conversations       Conversation[] @relation("UserConversations")
+}
+
+enum UserRole {
+  CUSTOMER
+  BUSINESS_OWNER
+  ADMIN
+}
+
+// ============================================
+// BUSINESS
+// ============================================
+
+model Business {
+  id              String            @id @default(cuid())
+  ownerId         String            @unique
+  name            String
+  slug            String            @unique
+  description     String?
+  logo            String?
+  coverImage      String?
+  phone           String?
+  email           String?
+  website         String?
+  address         String?
+  city            String?
+  country         String?
+  latitude        Float?
+  longitude       Float?
+  serviceRadius   Float             @default(10.0) // km
+  verificationStatus VerificationStatus @default(PENDING)
+  subscriptionPlan SubscriptionPlan  @default(FREE)
+  rating          Float             @default(0)
+  reviewCount     Int               @default(0)
+  totalEarnings   Float             @default(0)
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relations
+  owner           User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  services        Service[]
+  staff           Staff[]
+  portfolio       PortfolioItem[]
+  bookings        Booking[]
+  reviews         Review[]
+  favorites       Favorite[]
+  conversations   Conversation[]
+
+  @@index([latitude, longitude])
+  @@index([city])
+  @@index([verificationStatus])
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum SubscriptionPlan {
+  FREE
+  PREMIUM
+  FEATURED
+}
+
+// ============================================
+// SERVICES
+// ============================================
+
+model Service {
+  id          String    @id @default(cuid())
+  businessId  String
+  name        String
+  description String?
+  category    String
+  duration    Int       // minutes
+  price       Float
+  discountPrice Float?
+  imageUrl    String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  bookings    Booking[]
+  timeSlots   TimeSlot[]
+
+  @@index([category])
+}
+
+model TimeSlot {
+  id        String    @id @default(cuid())
+  serviceId String
+  date      String    // YYYY-MM-DD
+  startTime String    // HH:mm
+  endTime   String    // HH:mm
+  isBooked  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  // Relations
+  service   Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceId, date, startTime])
+}
+
+// ============================================
+// STAFF
+// ============================================
+
+model Staff {
+  id          String    @id @default(cuid())
+  businessId  String
+  name        String
+  avatar      String?
+  role        String    // barber, stylist, nail_technician, etc.
+  bio         String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  bookings    Booking[]
+
+  @@index([role])
+}
+
+// ============================================
+// PORTFOLIO
+// ============================================
+
+model PortfolioItem {
+  id          String      @id @default(cuid())
+  businessId  String
+  mediaType   MediaType
+  fileUrl     String
+  thumbnailUrl String?
+  caption     String?
+  tags        String?     // JSON array of tags
+  isFeatured  Boolean     @default(false)
+  likes       Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  business    Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([mediaType])
+  @@index([isFeatured])
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+// ============================================
+// BOOKINGS
+// ============================================
+
+model Booking {
+  id          String        @id @default(cuid())
+  customerId  String
+  businessId  String
+  serviceId   String
+  staffId     String?
+  date        String        // YYYY-MM-DD
+  startTime   String        // HH:mm
+  endTime     String        // HH:mm
+  status      BookingStatus @default(PENDING)
+  notes       String?
+  totalAmount Float
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  customer    User          @relation(fields: [customerId], references: [id])
+  business    Business      @relation(fields: [businessId], references: [id])
+  service     Service       @relation(fields: [serviceId], references: [id])
+  staff       Staff?        @relation(fields: [staffId], references: [id])
+  payment     Payment?
+  review      Review?
+
+  @@index([customerId])
+  @@index([businessId])
+  @@index([status])
+  @@index([date])
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+// ============================================
+// PAYMENTS
+// ============================================
+
+model Payment {
+  id            String        @id @default(cuid())
+  bookingId     String        @unique
+  userId        String
+  amount        Float
+  currency      String        @default("USD")
+  paymentMethod PaymentMethod
+  status        PaymentStatus @default(PENDING)
+  transactionId String?
+  metadata      String?       // JSON for additional payment details
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  booking       Booking       @relation(fields: [bookingId], references: [id])
+  user          User          @relation(fields: [userId], references: [id])
+
+  @@index([status])
+  @@index([paymentMethod])
+}
+
+enum PaymentMethod {
+  STRIPE
+  PAYPAL
+  MPESA
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+// ============================================
+// REVIEWS
+// ============================================
+
+model Review {
+  id          String    @id @default(cuid())
+  customerId  String
+  businessId  String
+  bookingId   String    @unique
+  rating      Int       // 1-5
+  comment     String?
+  isVerified  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  customer    User      @relation(fields: [customerId], references: [id])
+  business    Business  @relation(fields: [businessId], references: [id])
+  booking     Booking   @relation(fields: [bookingId], references: [id])
+
+  @@index([rating])
+  @@index([businessId])
+}
+
+// ============================================
+// FAVORITES
+// ============================================
+
+model Favorite {
+  id          String    @id @default(cuid())
+  userId      String
+  businessId  String
+  createdAt   DateTime  @default(now())
+
+  // Relations
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, businessId])
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+model Notification {
+  id          String            @id @default(cuid())
+  userId      String
+  title       String
+  message     String
+  type        NotificationType
+  data        String?           // JSON for additional data
+  isRead      Boolean           @default(false)
+  createdAt   DateTime          @default(now())
+
+  // Relations
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([type])
+}
+
+enum NotificationType {
+  BOOKING_CONFIRMED
+  BOOKING_CANCELLED
+  BOOKING_REMINDER
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  NEW_MESSAGE
+  NEW_REVIEW
+  SYSTEM_ALERT
+  VERIFICATION_UPDATE
+}
+
+// ============================================
+// CHAT / MESSAGING
+// ============================================
+
+model Conversation {
+  id            String        @id @default(cuid())
+  businessId    String
+  customerId    String
+  lastMessage   String?
+  lastMessageAt DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  business      Business      @relation(fields: [businessId], references: [id])
+  customer      User          @relation("UserConversations", fields: [customerId], references: [id])
+  messages      ChatMessage[]
+
+  @@unique([businessId, customerId])
+}
+
+model ChatMessage {
+  id             String        @id @default(cuid())
+  conversationId String
+  senderId       String
+  receiverId     String
+  content        String
+  isRead         Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+
+  // Relations
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User          @relation("SenderMessages", fields: [senderId], references: [id])
+  receiver       User          @relation("ReceiverMessages", fields: [receiverId], references: [id])
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([receiverId, isRead])
+}
+
+// ============================================
+// OTP VERIFICATION
+// ============================================
+
+model OTPVerification {
+  id        String    @id @default(cuid())
+  phone     String
+  code      String
+  expiresAt DateTime
+  isUsed    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  @@index([phone, code])
+}
+
+// ============================================
+// FORM SUBMISSIONS (Contact, Support, Reports)
+// ============================================
+
+model FormSubmission {
+  id          String            @id @default(cuid())
+  type        FormSubmissionType
+  name        String?
+  email       String?
+  phone       String?
+  subject     String?
+  message     String?
+  category    String?           // For reports and support inquiries
+  userId      String?           // If submitted by logged-in user
+  status      SubmissionStatus  @default(PENDING)
+  metadata    String?           // JSON for additional data
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum FormSubmissionType {
+  CONTACT
+  SUPPORT
+  ADVERTISE
+  REPORT
+  NEWSLETTER
+  CLAIM
+}
+
+enum SubmissionStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
+// ============================================
+// BLOCKED USERS
+// ============================================
+
+model BlockedUser {
+  id          String    @id @default(cuid())
+  userId      String    // User who blocked
+  blockedId   String    // User who is blocked
+  reason      String?
+  createdAt   DateTime  @default(now())
+
+  @@unique([userId, blockedId])
+  @@index([userId])
+  @@index([blockedId])
+}
+
+// ============================================
+// BLOG ARTICLES
+// ============================================
+
+model BlogArticle {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  excerpt     String
+  content     String    // Full article content (markdown)
+  image       String
+  category    String
+  author      String
+  authorImage String?
+  readTime    String
+  publishedAt DateTime?
+  isPublished Boolean   @default(false)
+  isFeatured  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([category])
+  @@index([isPublished])
+  @@index([isFeatured])
+}
+
+// ============================================
+// PLATFORM SETTINGS
+// ============================================
+
+model PlatformSetting {
+  id                    String    @id @default(cuid())
+  platformFee           Float     @default(15.0) // percentage
+  minWithdrawal         Float     @default(50.0)
+  featuredListingPrice  Float     @default(99.0)
+  premiumListingPrice   Float     @default(49.0)
+  maintenanceMode       Boolean   @default(false)
+  emailNotifications    Boolean   @default(true)
+  smsNotifications      Boolean   @default(false)
+  autoApproveBusinesses Boolean   @default(false)
+  requireIdVerification Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+// ============================================
+// PAGE CONTENT (Static Pages)
+// ============================================
+
+model PageContent {
+  id          String    @id @default(cuid())
+  page        String    @unique // about, privacy, terms, safety
+  title       String
+  content     String    // Rich text / markdown content
+  updatedBy   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([page])
+}
+
+// ============================================
+// ADMIN REPORTS
+// ============================================
+
+model AdminReport {
+  id              String        @id @default(cuid())
+  reporterId      String?
+  reporterName    String
+  reporterEmail   String
+  reportedUserId  String?
+  reportedUserName String
+  reportedUserEmail String?
+  type            ReportType
+  reason          String
+  description     String
+  evidence        String?       // JSON array of URLs
+  status          ReportStatus  @default(PENDING)
+  adminNotes      String?
+  action          ReportAction?
+  resolvedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
+
+enum ReportType {
+  USER
+  BUSINESS
+  REVIEW
+  MESSAGE
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  INVESTIGATING
+  RESOLVED
+  DISMISSED
+}
+
+enum ReportAction {
+  WARNING
+  SUSPENSION
+  BAN
+  NO_ACTION
+}
+
+// ============================================
+// USER BANS / SUSPENSIONS
+// ============================================
+
+model UserBan {
+  id                String        @id @default(cuid())
+  userId            String        @unique
+  userName          String
+  userEmail         String
+  bannedBy          String?
+  bannedAt          DateTime      @default(now())
+  reason            String
+  type              BanType       @default(SUSPENSION)
+  endDate           DateTime?     // null for permanent bans
+  isPermanent       Boolean       @default(false)
+  appealStatus      AppealStatus  @default(NONE)
+  appealReason      String?
+  appealDate        DateTime?
+  appealResolvedAt  DateTime?
+  adminNotes        String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([bannedAt])
+}
+
+enum BanType {
+  SUSPENSION  // Temporary
+  BAN         // Permanent
+}
+
+enum AppealStatus {
+  NONE
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ============================================
+// SUPPORT TICKETS
+// ============================================
+
+model SupportTicket {
+  id          String          @id @default(cuid())
+  userId      String?
+  userName    String
+  userEmail   String
+  subject     String
+  message     String
+  category    SupportCategory @default(GENERAL)
+  priority    TicketPriority  @default(MEDIUM)
+  status      TicketStatus    @default(OPEN)
+  assignedTo  String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  replies     TicketReply[]
+
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
+}
+
+model TicketReply {
+  id          String    @id @default(cuid())
+  ticketId    String
+  from        String    // USER or ADMIN
+  message     String
+  adminName   String?
+  createdAt   DateTime  @default(now())
+
+  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+enum SupportCategory {
+  GENERAL
+  TECHNICAL
+  BILLING
+  COMPLAINT
+  FEEDBACK
+  OTHER
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING
+  RESOLVED
+  CLOSED
+}
+
+// ============================================
+// ADVERTISEMENTS
+// ============================================
+
+model Advertisement {
+  id            String          @id @default(cuid())
+  businessName  String
+  businessId    String?
+  contactEmail  String
+  contactPhone  String?
+  package       AdPackage
+  duration      Int             // days
+  budget        Float
+  startDate     DateTime?
+  endDate       DateTime?
+  status        AdStatus        @default(PENDING)
+  impressions   Int             @default(0)
+  clicks        Int             @default(0)
+  conversions   Int             @default(0)
+  notes         String?
+  adminNotes    String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum AdPackage {
+  BASIC
+  PREMIUM
+  FEATURED
+  CUSTOM
+}
+
+enum AdStatus {
+  PENDING
+  APPROVED
+  ACTIVE
+  COMPLETED
+  REJECTED
+}
+
+// ============================================
+// INSURANCE CLAIMS
+// ============================================
+
+model InsuranceClaim {
+  id              String        @id @default(cuid())
+  claimNumber     String        @unique
+  customerId      String?
+  customerName    String
+  customerEmail   String
+  providerId      String?
+  providerName    String
+  bookingId       String?
+  type            ClaimType
+  description     String
+  amount          Float
+  currency        String        @default("USD")
+  status          ClaimStatus   @default(SUBMITTED)
+  documents       String?       // JSON array of document URLs
+  incidentDate    DateTime
+  submittedAt     DateTime      @default(now())
+  reviewedAt      DateTime?
+  reviewedBy      String?
+  adminNotes      String?
+  resolution      String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([status])
+  @@index([claimNumber])
+}
+
+enum ClaimType {
+  INJURY
+  DAMAGE
+  ALLERGIC_REACTION
+  OTHER
+}
+
+enum ClaimStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  PAID
+}
+
+// ============================================
+// PREMIUM LISTINGS
+// ============================================
+
+model PremiumListing {
+  id            String          @id @default(cuid())
+  businessId    String          @unique
+  businessName  String
+  plan          ListingPlan
+  price         Float
+  startDate     DateTime
+  endDate       DateTime
+  status        ListingStatus   @default(PENDING)
+  impressions   Int             @default(0)
+  clicks        Int             @default(0)
+  conversions   Int             @default(0)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([status])
+  @@index([endDate])
+}
+
+enum ListingPlan {
+  PREMIUM
+  FEATURED
+}
+
+enum ListingStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+// ============================================
+// DISPUTES
+// ============================================
+
+model Dispute {
+  id            String          @id @default(cuid())
+  bookingId     String?
+  customerId    String?
+  customerName  String
+  providerId    String?
+  providerName  String
+  type          String
+  description   String
+  status        DisputeStatus   @default(OPEN)
+  amount        Float
+  resolution    String?         // JSON: { type, amount, notes }
+  resolvedAt    DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum DisputeStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+// ============================================
+// PLATFORM TRANSACTIONS (Revenue Tracking)
+// ============================================
+
+model PlatformTransaction {
+  id              String              @id @default(cuid())
+  type            TransactionType
+  bookingId       String?
+  businessId      String?
+  userId          String?
+  amount          Float
+  platformFee     Float
+  providerAmount  Float
+  tip             Float               @default(0)
+  currency        String              @default("KES")
+  status          TransactionStatus   @default(PENDING)
+  escrowStatus    EscrowStatus?
+  paymentMethod   String?
+  transactionId   String?
+  metadata        String?             // JSON for additional details
+  description     String?
+  completedAt     DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([type])
+  @@index([status])
+  @@index([businessId])
+  @@index([createdAt])
+}
+
+enum TransactionType {
+  BOOKING_COMMISSION
+  PREMIUM_LISTING
+  MARKETING_BOOST
+  SUBSCRIPTION
+  TIP_PROCESSING
+  REFUND
+  CHARGEBACK
+  PAYOUT
+  ADJUSTMENT
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  REFUNDED
+  DISPUTED
+}
+
+enum EscrowStatus {
+  HELD
+  RELEASED
+  PARTIALLY_RELEASED
+  REFUNDED
+  DISPUTED
+}
+
+// ============================================
+// PAYOUTS
+// ============================================
+
+model Payout {
+  id              String          @id @default(cuid())
+  businessId      String
+  amount          Float
+  currency        String          @default("KES")
+  method          PayoutMethod
+  status          PayoutStatus    @default(PENDING)
+  transactionIds  String?         // JSON array of transaction IDs
+  referenceNumber String?
+  estimatedArrival DateTime?
+  processedAt     DateTime?
+  completedAt     DateTime?
+  failureReason   String?
+  fees            Float           @default(0)
+  netAmount       Float
+  metadata        String?         // JSON for additional details
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([businessId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum PayoutMethod {
+  BANK_TRANSFER
+  PAYPAL
+  MPESA
+  STRIPE
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  ON_HOLD
+}
+
+// ============================================
+// PROMOTIONS (Extended Premium Features)
+// ============================================
+
+model Promotion {
+  id              String            @id @default(cuid())
+  businessId      String
+  businessName    String
+  type            PromotionType
+  status          PromotionStatus   @default(ACTIVE)
+  startDate       DateTime
+  endDate         DateTime
+  price           Float
+  currency        String            @default("KES")
+  boostLevel      Int?              // For PROMOTED type: 1-5
+  section         String?           // For FEATURED: HOMEPAGE, CATEGORY, SEARCH
+  channels        String?           // For MARKETING_BOOST: JSON array
+  targetAudience  String?           // JSON for targeting options
+  autoRenew       Boolean           @default(false)
+  analytics       String?           // JSON for views, clicks, bookings, revenue
+  transactionId   String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([businessId])
+  @@index([type])
+  @@index([status])
+  @@index([endDate])
+}
+
+enum PromotionType {
+  PROMOTED
+  FEATURED
+  MARKETING_BOOST
+}
+
+enum PromotionStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+// ============================================
+// DISCOUNT CODES
+// ============================================
+
+model DiscountCode {
+  id              String          @id @default(cuid())
+  code            String          @unique
+  name            String
+  description     String?
+  type            DiscountType
+  value           Float
+  scope           DiscountScope
+  applicableIds   String?         // JSON array of business/category/service IDs
+  minimumPurchase Float?
+  maximumDiscount Float?
+  usageLimit      Int?
+  usageCount      Int             @default(0)
+  perUserLimit    Int?
+  startDate       DateTime
+  endDate         DateTime
+  isActive        Boolean         @default(true)
+  createdBy       String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([code])
+  @@index([isActive])
+  @@index([startDate, endDate])
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  FREE_SERVICE
+}
+
+enum DiscountScope {
+  PLATFORM
+  CATEGORY
+  BUSINESS
+  SERVICE
+}
