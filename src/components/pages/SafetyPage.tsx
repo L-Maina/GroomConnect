@@ -255,7 +255,7 @@ export const SafetyPage: React.FC<SafetyPageProps> = ({ onBack, onNavigate }) =>
   const handlePlanUpgrade = () => {
     if (!isAuthenticated) {
       setShowProtectionModal(false);
-      onNavigate?.('auth');
+      onNavigate?.('login');
       return;
     }
     

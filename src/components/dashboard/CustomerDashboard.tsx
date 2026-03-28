@@ -101,7 +101,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   const [reviewComment, setReviewComment] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
-  const { switchMode, isProvider, isClient } = useAuthStore();
+  const { switchMode, isProvider, isClient, isAuthenticated } = useAuthStore();
   const { formatPrice } = useCurrencyStore();
   
   const activeMode = user?.activeMode || 'CLIENT';
@@ -206,6 +206,42 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
       service: 'Classic Haircut',
     },
   ]);
+
+  // CRITICAL: Role-based access control - must be authenticated and in CLIENT mode
+  if (!user || !isAuthenticated || isAdmin || isProviderMode) {
+    return (
+      <div className="min-h-screen flex items-center justify-center py-8 px-4">
+        <GlassCard className="p-8 text-center max-w-md">
+          <UserIcon className="h-16 w-16 text-primary mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
+          <p className="text-muted-foreground mb-4">
+            {!user || !isAuthenticated
+              ? 'Please sign in to access your dashboard.'
+              : isAdmin 
+                ? 'Admin accounts cannot access the customer dashboard.'
+                : 'Please switch to Client mode to access this dashboard.'}
+          </p>
+          <div className="flex gap-2 justify-center">
+            {(!user || !isAuthenticated) && (
+              <>
+                <GlassButton variant="primary" onClick={() => onNavigate?.('login')}>
+                  Sign In
+                </GlassButton>
+                <GlassButton variant="outline" onClick={() => onNavigate?.('home')}>
+                  Browse Services
+                </GlassButton>
+              </>
+            )}
+            {isProviderMode && (
+              <GlassButton variant="primary" onClick={() => { switchMode('CLIENT'); }}>
+                Switch to Client Mode
+              </GlassButton>
+            )}
+          </div>
+        </GlassCard>
+      </div>
+    );
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {

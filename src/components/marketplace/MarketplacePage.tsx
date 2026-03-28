@@ -522,29 +522,12 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = ({
               {/* Location Search */}
               <div className="flex-1">
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Where?</label>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <LocationAutocomplete
-                      value={locationText}
-                      onChange={handleLocationChange}
-                      placeholder="Search location..."
-                      className="w-full"
-                    />
-                  </div>
-                  <GlassButton
-                    variant="outline"
-                    onClick={handleNearMe}
-                    disabled={isDetectingLocation}
-                    className="shrink-0"
-                    title="Use my location"
-                  >
-                    {isDetectingLocation ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Navigation className="h-4 w-4" />
-                    )}
-                  </GlassButton>
-                </div>
+                <LocationAutocomplete
+                  value={locationText}
+                  onChange={handleLocationChange}
+                  placeholder="Search location..."
+                  className="w-full"
+                />
               </div>
 
               {/* Search Button */}
@@ -554,6 +537,7 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = ({
                   size="lg"
                   className="w-full lg:w-auto px-8"
                   leftIcon={<Search className="h-4 w-4" />}
+                  onClick={() => onSearch?.(query)}
                 >
                   Search
                 </GlassButton>
@@ -592,9 +576,9 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = ({
 
         {/* Filter Bar */}
         <FadeIn delay={0.15}>
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <div className="flex items-center gap-3 mb-6">
             {/* Left: Filter Buttons */}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 flex-1 flex-nowrap overflow-x-auto scrollbar-hide pb-1">
               {/* Mobile Filter Button */}
               <GlassButton
                 variant="default"
@@ -611,7 +595,7 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = ({
               </GlassButton>
 
               {/* Desktop Filter Pills */}
-              <div className="hidden lg:flex items-center gap-2">
+              <div className="hidden lg:flex items-center gap-2 flex-nowrap">
                 {/* Price Filter Dropdown */}
                 <div className="relative group">
                   <button
@@ -892,7 +876,7 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = ({
             </div>
 
             {/* Right: Sort & View */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-shrink-0">
               {/* Sort Dropdown */}
               <div className="relative" onClick={(e) => e.stopPropagation()}>
                 <button

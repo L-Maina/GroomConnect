@@ -3,8 +3,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, LocateFixed, X, Loader2, Clock } from 'lucide-react';
+import { MapPin, LocateFixed, X, Loader2, Clock, MapPinned } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface LocationResult {
   place_id: string;
@@ -212,9 +213,11 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
   };
 
   // Detect current location
-  const handleDetectLocation = () => {
+  const handleDetectLocation = useCallback(() => {
     if (!navigator.geolocation) {
-      console.log('Geolocation is not supported by this browser');
+      toast.error('Location Not Supported', {
+        description: 'Your browser does not support geolocation. Please enter your location manually.',
+      });
       return;
     }
 
@@ -244,24 +247,56 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
           if (data.address?.country && onCountryChange) {
             onCountryChange(data.address.country);
           }
+          
+          toast.success('Location Detected', {
+            description: `Your location has been set to ${displayName}`,
+          });
         } catch (error) {
           console.error('Reverse geocoding error:', error);
           // Still set coordinates even if reverse geocoding fails
           const coords = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
           setQuery(coords);
           onChange(coords, { lat: latitude, lng: longitude });
+          
+          toast.success('Location Set', {
+            description: `Your coordinates have been set to ${coords}`,
+          });
         } finally {
           setIsDetecting(false);
           setIsOpen(false);
         }
       },
       (error) => {
-        console.error('Geolocation error:', error);
         setIsDetecting(false);
+        
+        // Handle specific geolocation errors with user-friendly messages
+        let title = 'Location Error';
+        let description = 'Unable to detect your location. Please enter it manually.';
+        
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            title = 'Location Permission Denied';
+            description = 'Please enable location permissions in your browser settings or enter your location manually.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            title = 'Location Unavailable';
+            description = 'Your location information is unavailable. Please enter your location manually.';
+            break;
+          case error.TIMEOUT:
+            title = 'Location Timeout';
+            description = 'Location request timed out. Please try again or enter your location manually.';
+            break;
+          default:
+            description = `An unknown error occurred (${error.code}). Please enter your location manually.`;
+        }
+        
+        toast.error(title, {
+          description,
+        });
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-  };
+  }, [onChange, onCityChange, onCountryChange, saveRecentLocation]);
 
   // Handle keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {

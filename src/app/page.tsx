@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { AlertCircle, User } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { HeroSection } from '@/components/home/HeroSection';
@@ -30,6 +31,7 @@ import { SafetyPage } from '@/components/pages/SafetyPage';
 import { BlogPage } from '@/components/pages/BlogPage';
 import { AdvertisePage } from '@/components/pages/AdvertisePage';
 import { InsuranceClaimsPage } from '@/components/pages/InsuranceClaimsPage';
+import { GlassButton } from '@/components/ui/custom/glass-components';
 import { useAuthStore, useAdminStore } from '@/store';
 import type { Business, Service } from '@/types';
 
@@ -397,6 +399,13 @@ export default function HomePage() {
             key="map"
             businesses={sampleBusinesses}
             onSelectBusiness={handleSelectBusiness}
+            onBookBusiness={(business) => {
+              // Require auth for booking
+              requireAuth('book', () => {
+                handleSelectBusiness(business);
+                handleNavigate('booking');
+              });
+            }}
           />
         );
 
@@ -807,6 +816,29 @@ export default function HomePage() {
         );
 
       case 'disputes':
+        // Require auth for disputes
+        if (isGuest) {
+          return (
+            <div key="disputes-auth" className="min-h-screen py-8 px-4">
+              <div className="max-w-2xl mx-auto text-center py-16">
+                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
+                  <AlertCircle className="h-10 w-10 text-primary" />
+                </div>
+                <h2 className="text-xl font-semibold mb-3">Sign In Required</h2>
+                <p className="text-muted-foreground mb-6">
+                  You need to be signed in to view and manage disputes.
+                </p>
+                <GlassButton
+                  variant="primary"
+                  onClick={() => handleNavigate('login')}
+                  leftIcon={<User className="h-4 w-4" />}
+                >
+                  Sign In / Sign Up
+                </GlassButton>
+              </div>
+            </div>
+          );
+        }
         return (
           <div key="disputes" className="min-h-screen py-8 px-4">
             <div className="max-w-6xl mx-auto">
@@ -997,6 +1029,54 @@ export default function HomePage() {
               >
                 Back to Home
               </button>
+            </div>
+          </motion.div>
+        );
+
+      case 'forgot-password':
+        return (
+          <motion.div
+            key="forgot-password"
+            variants={pageVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            className="min-h-screen flex items-center justify-center py-12 px-4"
+          >
+            <div className="w-full max-w-md">
+              <div className="glass-card p-8 rounded-2xl">
+                <div className="text-center mb-6">
+                  <h1 className="text-2xl font-bold mb-2">Reset Password</h1>
+                  <p className="text-muted-foreground">Enter your email and we'll send you a reset link</p>
+                </div>
+                <form className="space-y-4" onSubmit={(e) => {
+                  e.preventDefault();
+                  alert('Password reset link sent! Check your email.');
+                  handleNavigate('login');
+                }}>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Email</label>
+                    <input
+                      type="email"
+                      placeholder="Enter your email"
+                      required
+                      className="w-full h-10 px-3 rounded-lg border border-input bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-sm text-foreground dark:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full h-12 px-6 rounded-lg gradient-bg text-white font-medium"
+                  >
+                    Send Reset Link
+                  </button>
+                </form>
+                <button
+                  onClick={() => handleNavigate('login')}
+                  className="w-full mt-4 text-sm text-primary hover:underline"
+                >
+                  Back to Sign In
+                </button>
+              </div>
             </div>
           </motion.div>
         );

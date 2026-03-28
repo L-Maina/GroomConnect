@@ -239,7 +239,7 @@ const BusinessDetailPanel: React.FC<{
             {business.logo ? (
               <img src={business.logo} alt={business.name} className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center text-gray-500 text-xl font-semibold">
+              <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-slate-600 dark:to-slate-700 flex items-center justify-center text-gray-500 dark:text-slate-300 text-xl font-semibold">
                 {business.name.charAt(0)}
               </div>
             )}
@@ -247,7 +247,7 @@ const BusinessDetailPanel: React.FC<{
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 text-lg">{business.name}</h3>
+                <h3 className="font-semibold text-gray-900 dark:text-white text-lg">{business.name}</h3>
                 <div className="flex items-center gap-2 mt-1">
                   <span 
                     className="text-xs px-2 py-0.5 rounded-full font-medium"
@@ -255,26 +255,26 @@ const BusinessDetailPanel: React.FC<{
                   >
                     {serviceType === 'at_provider' ? 'At Location' : serviceType === 'mobile' ? 'Mobile' : 'Both'}
                   </span>
-                  <span className="text-xs text-gray-500">{business.category || 'Grooming'}</span>
+                  <span className="text-xs text-gray-500 dark:text-slate-400">{business.category || 'Grooming'}</span>
                 </div>
               </div>
-              <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100/50 transition-colors">
-                <X className="h-5 w-5 text-gray-400" />
+              <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100/50 dark:hover:bg-slate-700/50 transition-colors">
+                <X className="h-5 w-5 text-gray-400 dark:text-slate-400" />
               </button>
             </div>
             <div className="flex items-center gap-3 mt-2">
               <div className="flex items-center gap-1">
                 <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
                 <span className="text-sm font-semibold">{business.rating.toFixed(1)}</span>
-                <span className="text-xs text-gray-400">({business.reviewCount})</span>
+                <span className="text-xs text-gray-400 dark:text-slate-500">({business.reviewCount})</span>
               </div>
               {business.distance && (
                 <>
-                  <span className="text-gray-300">•</span>
-                  <span className="text-sm text-gray-600">{(business.distance / 1000).toFixed(1)} km away</span>
+                  <span className="text-gray-300 dark:text-slate-600">•</span>
+                  <span className="text-sm text-gray-600 dark:text-slate-300">{(business.distance / 1000).toFixed(1)} km away</span>
                 </>
               )}
-              <span className="text-gray-300">•</span>
+              <span className="text-gray-300 dark:text-slate-600">•</span>
               <span className="text-sm font-semibold" style={{ color: serviceColor }}>${price}</span>
             </div>
           </div>
@@ -293,12 +293,12 @@ const BusinessDetailPanel: React.FC<{
               `https://www.google.com/maps/dir/?api=1&destination=${business.latitude},${business.longitude}`, 
               '_blank'
             )} 
-            className="flex-1 flex items-center justify-center gap-2 py-3 backdrop-blur-2xl bg-white/50 text-gray-700 rounded-xl font-medium text-sm hover:bg-white/70 transition-colors border border-white/30"
+            className="flex-1 flex items-center justify-center gap-2 py-3 backdrop-blur-2xl bg-white/50 dark:bg-slate-700/50 text-gray-700 dark:text-slate-200 rounded-xl font-medium text-sm hover:bg-white/70 dark:hover:bg-slate-600/70 transition-colors border border-white/30 dark:border-slate-600/30"
           >
             <Navigation2 className="h-4 w-4" /> Directions
           </button>
-          <button className="w-12 h-12 flex items-center justify-center backdrop-blur-2xl bg-white/50 rounded-xl hover:bg-white/70 transition-colors border border-white/30">
-            <Heart className="h-5 w-5 text-gray-600" />
+          <button className="w-12 h-12 flex items-center justify-center backdrop-blur-2xl bg-white/50 dark:bg-slate-700/50 rounded-xl hover:bg-white/70 dark:hover:bg-slate-600/70 transition-colors border border-white/30 dark:border-slate-600/30">
+            <Heart className="h-5 w-5 text-gray-600 dark:text-slate-300" />
           </button>
         </div>
         

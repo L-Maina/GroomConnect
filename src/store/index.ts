@@ -617,8 +617,6 @@ export const currencyMeta: Record<string, { symbol: string; locale: string; name
   VUV: { symbol: 'Vt', locale: 'en-VU', name: 'Vanuatu Vatu' },
   SBD: { symbol: 'SI$', locale: 'en-SB', name: 'Solomon Islands Dollar' },
   PGK: { symbol: 'K', locale: 'en-PG', name: 'Papua New Guinean Kina' },
-  AUD: { symbol: '$', locale: 'en-AU', name: 'Australian Dollar' },
-  NZD: { symbol: '$', locale: 'en-NZ', name: 'New Zealand Dollar' },
   XPF: { symbol: '₣', locale: 'fr-NC', name: 'CFP Franc' },
 };
 

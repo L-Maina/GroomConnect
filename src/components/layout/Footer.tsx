@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { GradientText } from '@/components/ui/custom/glass-components';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface FooterProps {
   onNavigate?: (page: string) => void;
@@ -31,6 +32,15 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onSetSearchQuery, on
     e.preventDefault();
     action();
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSocialClick = (e: React.MouseEvent, label: string, comingSoon?: boolean) => {
+    e.preventDefault();
+    if (comingSoon) {
+      toast.info('Coming Soon', {
+        description: `${label} page will be available soon.`,
+      });
+    }
   };
 
   // Handle service link click - auto-detect location and navigate to marketplace
@@ -74,10 +84,10 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onSetSearchQuery, on
   };
 
   const socialLinks = [
-    { icon: Facebook, href: 'https://facebook.com/groomconnect', label: 'Facebook' },
-    { icon: Twitter, href: 'https://twitter.com/groomconnect', label: 'Twitter' },
-    { icon: Instagram, href: 'https://instagram.com/groomconnect', label: 'Instagram' },
-    { icon: Linkedin, href: 'https://linkedin.com/company/groomconnect', label: 'LinkedIn' },
+    { icon: Facebook, href: '#', label: 'Facebook', comingSoon: true },
+    { icon: Twitter, href: '#', label: 'Twitter', comingSoon: true },
+    { icon: Instagram, href: '#', label: 'Instagram', comingSoon: true },
+    { icon: Linkedin, href: '#', label: 'LinkedIn', comingSoon: true },
   ];
 
   const features = [
@@ -270,23 +280,21 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onSetSearchQuery, on
                 <span className="text-slate-400 text-sm">Follow Us:</span>
                 <div className="flex items-center gap-2">
                   {socialLinks.map((social) => (
-                    <a
+                    <button
                       key={social.label}
-                      href={social.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      onClick={(e) => handleSocialClick(e, social.label, social.comingSoon)}
                       className={cn(
                         'h-9 w-9 rounded-lg flex items-center justify-center',
                         'bg-white/10 backdrop-blur-sm',
                         'border border-white/10',
                         'text-white transition-all duration-200',
                         'hover:bg-gradient-to-r hover:from-primary/30 hover:to-secondary/30',
-                        'hover:border-white/20'
+                        'hover:border-white/20 cursor-pointer'
                       )}
                       aria-label={social.label}
                     >
                       <social.icon className="h-4 w-4" />
-                    </a>
+                    </button>
                   ))}
                 </div>
               </div>

@@ -114,8 +114,9 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   
-  // Business ID for this dashboard (in production, this would come from the user's business)
-  const businessId = 'b1';
+  // Business ID - derived from user context or fallback to demo data
+  // In production, this would come from the authenticated user's business record
+  const businessId = user?.businessId || 'b1';
   const businessData = businesses[businessId];
 
   // Business data state
@@ -183,6 +184,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
     category: 'Haircuts & Styling',
     duration: 30,
     price: 0,
+    imageUrl: '',
   });
 
   const [staffForm, setStaffForm] = useState({
@@ -312,7 +314,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
   // Service CRUD
   const handleAddService = () => {
     setEditingService(null);
-    setServiceForm({ name: '', description: '', category: 'Haircuts & Styling', duration: 30, price: 0 });
+    setServiceForm({ name: '', description: '', category: 'Haircuts & Styling', duration: 30, price: 0, imageUrl: '' });
     setShowServiceModal(true);
   };
 
@@ -324,6 +326,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
       category: service.category,
       duration: service.duration,
       price: service.price,
+      imageUrl: service.imageUrl || '',
     });
     setShowServiceModal(true);
   };
@@ -507,17 +510,32 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
     { label: 'Rating', value: averageRating.toString(), change: '+0.2', icon: Star, color: 'from-yellow-500 to-orange-500' },
   ];
 
-  // Redirect if not authenticated
-  if (!isAuthenticated) {
+  // Redirect if not authenticated or not a business owner
+  const hasBusinessRole = user?.roles?.includes('BUSINESS_OWNER') || user?.role === 'BUSINESS_OWNER';
+  
+  if (!isAuthenticated || !user || !hasBusinessRole) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <GlassCard className="p-8 text-center">
+        <GlassCard className="p-8 text-center max-w-md">
           <AlertCircle className="h-12 w-12 text-primary mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
-          <p className="text-muted-foreground mb-4">Please log in to access your business dashboard</p>
-          <GlassButton variant="primary" onClick={() => onNavigate?.('login')}>
-            Sign In
-          </GlassButton>
+          <p className="text-muted-foreground mb-4">
+            {!user 
+              ? 'Please log in to access your business dashboard' 
+              : 'You need to register as a business owner to access this dashboard'}
+          </p>
+          <div className="flex gap-2 justify-center">
+            {!user && (
+              <GlassButton variant="primary" onClick={() => onNavigate?.('login')}>
+                Sign In
+              </GlassButton>
+            )}
+            {user && !hasBusinessRole && (
+              <GlassButton variant="primary" onClick={() => onNavigate?.('onboarding')}>
+                Become a Provider
+              </GlassButton>
+            )}
+          </div>
         </GlassCard>
       </div>
     );
@@ -726,8 +744,12 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                       )}>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
-                              <Scissors className="h-6 w-6 text-primary" />
+                            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center overflow-hidden">
+                              {service.imageUrl ? (
+                                <img src={service.imageUrl} alt={service.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <Scissors className="h-6 w-6 text-primary" />
+                              )}
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
@@ -1813,6 +1835,46 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
                     placeholder="Describe your service..."
                     className="w-full h-20 px-3 py-2 rounded-lg border border-input bg-background/50 backdrop-blur-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Service Image</label>
+                  <div className="flex items-center gap-4">
+                    {serviceForm.imageUrl ? (
+                      <div className="relative w-20 h-20 rounded-lg overflow-hidden">
+                        <img src={serviceForm.imageUrl} alt="Service" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setServiceForm(prev => ({ ...prev, imageUrl: '' }))}
+                          className="absolute top-1 right-1 p-1 bg-destructive text-white rounded-full"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center w-20 h-20 rounded-lg border-2 border-dashed border-border hover:border-primary/50 cursor-pointer transition-colors">
+                        <Upload className="h-5 w-5 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground mt-1">Upload</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = (ev) => {
+                                setServiceForm(prev => ({ ...prev, imageUrl: ev.target?.result as string }));
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                    <p className="text-xs text-muted-foreground flex-1">
+                      Upload an image for your service. Recommended size: 400x300px. Max 5MB.
+                    </p>
+                  </div>
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-2 block">Category</label>

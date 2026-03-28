@@ -14,17 +14,14 @@ import {
   BarChart3,
   Zap,
   Star,
-  Send,
   CheckCircle,
-  AlertCircle,
-  Eye,
-  MousePointer,
-  ShoppingCart,
-  Crown,
-  Rocket,
   X,
   ChevronRight,
-  LogIn
+  LogIn,
+  CreditCard,
+  Wallet,
+  Smartphone,
+  Lock,
 } from 'lucide-react';
 import { useAuthStore } from '@/store';
 import { 
@@ -33,14 +30,87 @@ import {
   GlassInput,
   GradientText,
   FadeIn,
-  GlassBadge,
-  GlassModal
+  GlassBadge
 } from '@/components/ui/custom/glass-components';
+import { toast } from 'sonner';
 
 interface AdvertisePageProps {
   onBack: () => void;
   onNavigate?: (page: string) => void;
 }
+
+// Payment method types
+type PaymentMethodType = 'card' | 'paypal' | 'mpesa';
+
+// Liquid Glass Modal Component - defined outside main component
+const LiquidGlassModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+}> = ({ isOpen, onClose, children, size = 'md' }) => {
+  if (!isOpen) return null;
+
+  const sizeClasses = {
+    sm: 'max-w-sm',
+    md: 'max-w-md',
+    lg: 'max-w-lg',
+    xl: 'max-w-2xl',
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        onClick={onClose}
+      >
+        {/* Backdrop */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="absolute inset-0 bg-black/60 backdrop-blur-md"
+        />
+        
+        {/* Modal Content - Liquid Glass Style */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
+          className={`relative w-full ${sizeClasses[size]} rounded-2xl shadow-2xl overflow-hidden`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Liquid glass base layer */}
+          <div className="absolute inset-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl" />
+          
+          {/* Gradient overlay for glass effect */}
+          <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-white/20 dark:from-white/10 dark:via-transparent dark:to-white/5" />
+          
+          {/* Primary color glow */}
+          <div className="absolute -top-20 -right-20 w-64 h-64 bg-primary/20 rounded-full blur-3xl" />
+          <div className="absolute -bottom-20 -left-20 w-48 h-48 bg-secondary/20 rounded-full blur-3xl" />
+          
+          {/* Glass reflection */}
+          <div className="absolute inset-0 bg-gradient-to-b from-white/30 to-transparent h-1/3 dark:from-white/10" />
+          
+          {/* Border glow */}
+          <div className="absolute inset-0 rounded-2xl ring-1 ring-white/50 dark:ring-white/10" />
+          
+          {/* Outer glow */}
+          <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 via-secondary/20 to-primary/20 rounded-3xl blur-xl opacity-50" />
+          
+          {/* Content */}
+          <div className="relative z-10 text-foreground">
+            {children}
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
 
 const audienceStats = [
   { value: '500K+', label: 'Monthly Active Users', icon: Users },
@@ -169,6 +239,15 @@ const successStories = [
   },
 ];
 
+// Import icons that are used but not imported yet
+import { 
+  Crown,
+  Rocket,
+  Eye,
+  MousePointer,
+  ShoppingCart
+} from 'lucide-react';
+
 export const AdvertisePage: React.FC<AdvertisePageProps> = ({ onBack, onNavigate }) => {
   const { isAuthenticated, user } = useAuthStore();
   
@@ -176,81 +255,83 @@ export const AdvertisePage: React.FC<AdvertisePageProps> = ({ onBack, onNavigate
   const hasProviderRole = user?.roles?.includes('BUSINESS_OWNER') || user?.role === 'BUSINESS_OWNER';
   
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [showPlanModal, setShowPlanModal] = useState(false);
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
   const [showOnboardingPrompt, setShowOnboardingPrompt] = useState(false);
-  const [contactForm, setContactForm] = useState({
-    company: '',
-    email: '',
-    phone: '',
-    budget: '',
-    message: '',
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  
+  // Payment state
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>('card');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [cardNumber, setCardNumber] = useState('');
+  const [expiry, setExpiry] = useState('');
+  const [cvv, setCvv] = useState('');
+  const [cardName, setCardName] = useState('');
+  const [billingAddress, setBillingAddress] = useState('');
+
+  const selectedPlanData = adOptions.find(p => p.id === selectedPlan);
 
   const handleGetStarted = (planId: string) => {
     if (!isAuthenticated) {
-      // Non-logged-in user - prompt login
       setSelectedPlan(planId);
       setShowSignInPrompt(true);
       return;
     }
     
     if (!hasProviderRole) {
-      // Logged-in but not a provider - prompt onboarding
       setSelectedPlan(planId);
       setShowOnboardingPrompt(true);
       return;
     }
     
-    // Logged-in provider - show plan modal
+    // Logged-in provider - go directly to payment
     setSelectedPlan(planId);
-    setShowPlanModal(true);
+    setShowPaymentModal(true);
   };
 
-  const handleContinueToForm = () => {
-    setShowPlanModal(false);
-    setTimeout(() => {
-      document.getElementById('contact-form')?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+  const formatCardNumber = (value: string) => {
+    const cleaned = value.replace(/\D/g, '').slice(0, 16);
+    return cleaned.replace(/(\d{4})(?=\d)/g, '$1 ');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setSubmitStatus('idle');
-
-    try {
-      const response = await fetch('/api/submissions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'ADVERTISE',
-          name: contactForm.company,
-          email: contactForm.email,
-          phone: contactForm.phone,
-          subject: `Advertising Inquiry: ${selectedPlan || 'General'}`,
-          message: `Budget: ${contactForm.budget}\n\n${contactForm.message}`,
-          metadata: JSON.stringify({ plan: selectedPlan, budget: contactForm.budget }),
-        }),
-      });
-
-      if (response.ok) {
-        setSubmitStatus('success');
-        setContactForm({ company: '', email: '', phone: '', budget: '', message: '' });
-        setSelectedPlan(null);
-      } else {
-        setSubmitStatus('error');
-      }
-    } catch {
-      setSubmitStatus('error');
-    } finally {
-      setIsSubmitting(false);
+  const formatExpiry = (value: string) => {
+    const cleaned = value.replace(/\D/g, '').slice(0, 4);
+    if (cleaned.length >= 2) {
+      return `${cleaned.slice(0, 2)}/${cleaned.slice(2)}`;
     }
+    return cleaned;
   };
 
-  const selectedPlanData = adOptions.find(p => p.id === selectedPlan);
+  const isFormValid = () => {
+    if (paymentMethod === 'card') {
+      return (
+        cardNumber.replace(/\s/g, '').length >= 15 &&
+        expiry.length === 5 &&
+        cvv.length >= 3 &&
+        cardName.length >= 2 &&
+        billingAddress.length >= 5
+      );
+    }
+    return true;
+  };
+
+  const handlePayment = async () => {
+    if (!isFormValid()) {
+      toast.error('Please fill in all payment details');
+      return;
+    }
+
+    setIsProcessing(true);
+    
+    // Simulate payment processing
+    await new Promise(resolve => setTimeout(resolve, 2500));
+    
+    setIsProcessing(false);
+    setShowPaymentModal(false);
+    setShowSuccessModal(true);
+    
+    toast.success('Payment successful! Your advertising plan is now active.');
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 relative overflow-hidden">
@@ -291,8 +372,8 @@ export const AdvertisePage: React.FC<AdvertisePageProps> = ({ onBack, onNavigate
                 transition={{ delay: index * 0.05 }}
               >
                 <GlassCard 
-                  variant="gradient" 
-                  className="text-center relative overflow-hidden group gradient-bg"
+                  variant="elevated" 
+                  className="text-center relative overflow-hidden group gradient-bg border-0"
                   glow
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -318,7 +399,6 @@ export const AdvertisePage: React.FC<AdvertisePageProps> = ({ onBack, onNavigate
                   transition={{ delay: index * 0.05 }}
                 >
                   <GlassCard hover className="text-center h-full group relative overflow-hidden">
-                    {/* Shimmer effect */}
                     <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                     
                     <div 
@@ -329,10 +409,7 @@ export const AdvertisePage: React.FC<AdvertisePageProps> = ({ onBack, onNavigate
                     </div>
                     <h3 className="font-semibold mb-2">{format.title}</h3>
                     <p className="text-sm text-muted-foreground mb-3">{format.description}</p>
-                    <GlassBadge 
-                      variant="success" 
-                      className="text-xs"
-                    >
+                    <GlassBadge variant="success" className="text-xs">
                       {format.stats}
                     </GlassBadge>
                   </GlassCard>
@@ -345,26 +422,25 @@ export const AdvertisePage: React.FC<AdvertisePageProps> = ({ onBack, onNavigate
         {/* Pricing Packages */}
         <FadeIn delay={0.3}>
           <h2 className="text-2xl font-bold mb-6 text-center">Choose Your Package</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12 items-stretch">
             {adOptions.map((option, index) => (
               <motion.div
                 key={option.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className={option.popular ? 'md:-mt-4 md:mb-4' : ''}
+                className="h-full"
               >
                 <GlassCard 
-                  variant={option.popular ? 'gradient' : 'elevated'} 
+                  variant="elevated" 
                   hover
                   glow={option.popular}
-                  className={`h-full relative overflow-hidden ${
-                    option.popular ? 'ring-2 ring-white/30 gradient-bg' : ''
+                  className={`h-full relative overflow-hidden border-0 flex flex-col ${
+                    option.popular ? 'gradient-bg ring-2 ring-white/30' : ''
                   } ${selectedPlan === option.id ? 'ring-2 ring-primary' : ''}`}
                 >
-                  {/* Popular badge */}
                   {option.popular && (
-                    <div className="absolute -top-0 right-0">
+                    <div className="absolute top-0 right-0 z-20">
                       <div className="bg-gradient-to-r from-yellow-400 to-orange-400 text-white text-xs font-bold px-4 py-1 rounded-bl-lg flex items-center gap-1">
                         <Crown className="h-3 w-3" />
                         MOST POPULAR
@@ -372,14 +448,13 @@ export const AdvertisePage: React.FC<AdvertisePageProps> = ({ onBack, onNavigate
                     </div>
                   )}
 
-                  {/* Liquid glass shimmer */}
                   <div className="absolute inset-0 -translate-x-full animate-[shimmer_3s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent pointer-events-none" />
                   
-                  <div className="relative z-10">
-                    {/* Icon and name */}
-                    <div className="flex items-center gap-3 mb-4 mt-2">
+                  <div className="relative z-10 flex flex-col h-full">
+                    {/* Header */}
+                    <div className="flex items-center gap-3 mb-4">
                       <div 
-                        className={`w-12 h-12 rounded-xl flex items-center justify-center ${option.popular ? 'bg-white/20' : ''}`}
+                        className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${option.popular ? 'bg-white/20' : ''}`}
                         style={!option.popular ? { backgroundColor: `${option.color}15` } : undefined}
                       >
                         <option.icon 
@@ -387,22 +462,20 @@ export const AdvertisePage: React.FC<AdvertisePageProps> = ({ onBack, onNavigate
                           style={{ color: option.popular ? 'white' : option.color }} 
                         />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <h3 className={`text-xl font-bold ${option.popular ? 'text-white' : ''}`}>
                           {option.name}
                         </h3>
-                        <p className={`text-xs ${option.popular ? 'text-white/70' : 'text-muted-foreground'}`}>
+                        <p className={`text-xs truncate ${option.popular ? 'text-white/70' : 'text-muted-foreground'}`}>
                           {option.shortDescription}
                         </p>
                       </div>
                     </div>
 
-                    {/* Description */}
                     <p className={`text-sm mb-4 ${option.popular ? 'text-white/80' : 'text-muted-foreground'}`}>
                       {option.description}
                     </p>
 
-                    {/* Price */}
                     <div className={`mb-4 p-4 rounded-xl backdrop-blur-sm ${option.popular ? 'bg-white/10' : 'bg-muted/30'}`}>
                       <div className={`text-3xl font-bold ${option.popular ? 'text-white' : 'gradient-text'}`}>
                         {option.price}
@@ -412,7 +485,6 @@ export const AdvertisePage: React.FC<AdvertisePageProps> = ({ onBack, onNavigate
                       </div>
                     </div>
 
-                    {/* Highlighted feature */}
                     <div className={`mb-4 p-3 rounded-lg border ${
                       option.popular 
                         ? 'bg-white/10 border-white/20 text-white' 
@@ -426,8 +498,7 @@ export const AdvertisePage: React.FC<AdvertisePageProps> = ({ onBack, onNavigate
                       </div>
                     </div>
 
-                    {/* Features list */}
-                    <ul className="space-y-2 mb-6">
+                    <ul className="space-y-2 mb-6 flex-grow">
                       {option.features.slice(0, 5).map((feature) => (
                         <li key={feature} className="flex items-start gap-2">
                           <CheckCircle2 className={`h-4 w-4 mt-0.5 flex-shrink-0 ${option.popular ? 'text-white' : 'text-green-600'}`} />
@@ -443,10 +514,10 @@ export const AdvertisePage: React.FC<AdvertisePageProps> = ({ onBack, onNavigate
                       )}
                     </ul>
 
-                    {/* CTA Button */}
+                    {/* Button at bottom */}
                     <GlassButton 
                       variant={option.popular ? 'primary' : 'outline'} 
-                      className={`w-full ${option.popular ? 'bg-white text-primary hover:bg-white/90' : ''}`}
+                      className={`w-full mt-auto ${option.popular ? 'bg-white text-primary hover:bg-white/90' : ''}`}
                       onClick={() => handleGetStarted(option.id)}
                       rightIcon={<ChevronRight className="h-4 w-4" />}
                     >
@@ -462,7 +533,6 @@ export const AdvertisePage: React.FC<AdvertisePageProps> = ({ onBack, onNavigate
         {/* ROI Section */}
         <FadeIn delay={0.4}>
           <GlassCard variant="bordered" className="mb-12 relative overflow-hidden">
-            {/* Background decoration */}
             <div className="absolute -right-20 -bottom-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
             <div className="absolute -left-10 -top-10 w-32 h-32 bg-secondary/5 rounded-full blur-2xl" />
             
@@ -538,7 +608,6 @@ export const AdvertisePage: React.FC<AdvertisePageProps> = ({ onBack, onNavigate
                 transition={{ delay: index * 0.1 }}
               >
                 <GlassCard hover className="relative overflow-hidden group">
-                  {/* Liquid glass hover effect */}
                   <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                   
                   <div className="relative z-10">
@@ -563,142 +632,6 @@ export const AdvertisePage: React.FC<AdvertisePageProps> = ({ onBack, onNavigate
               </motion.div>
             ))}
           </div>
-        </FadeIn>
-
-        {/* Contact Form */}
-        <FadeIn delay={0.5} id="contact-form">
-          <GlassCard variant="elevated" className="relative overflow-hidden">
-            {/* Decorative elements */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
-            
-            <div className="relative z-10">
-              <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold mb-2 text-foreground">Get in Touch</h2>
-                <p className="text-foreground/80">
-                  Ready to grow your business? Contact our advertising team today.
-                </p>
-                {selectedPlan && selectedPlanData && (
-                  <div className="mt-4 inline-flex items-center gap-2 p-2 px-4 rounded-full bg-primary/10 border border-primary/20">
-                    <selectedPlanData.icon className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium">Selected: {selectedPlanData.name}</span>
-                    <button 
-                      onClick={() => setSelectedPlan(null)}
-                      className="ml-2 hover:bg-primary/20 rounded-full p-0.5"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                )}
-              </div>
-              
-              {/* Status Messages */}
-              <AnimatePresence>
-                {submitStatus === 'success' && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="mb-6 p-4 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center gap-3"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-green-700 dark:text-green-400">Inquiry submitted successfully!</p>
-                      <p className="text-sm text-green-600 dark:text-green-500">Our advertising team will contact you within 24 hours.</p>
-                    </div>
-                  </motion.div>
-                )}
-                
-                {submitStatus === 'error' && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
-                      <AlertCircle className="h-5 w-5 text-red-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-red-700 dark:text-red-400">Failed to submit inquiry</p>
-                      <p className="text-sm text-red-600 dark:text-red-500">Please try again or contact us directly.</p>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Company Name *</label>
-                    <GlassInput
-                      placeholder="Your company"
-                      value={contactForm.company}
-                      onChange={(e) => setContactForm({ ...contactForm, company: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Email *</label>
-                    <GlassInput
-                      type="email"
-                      placeholder="your@company.com"
-                      value={contactForm.email}
-                      onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Phone</label>
-                    <GlassInput
-                      type="tel"
-                      placeholder="+1 (555) 123-4567"
-                      value={contactForm.phone}
-                      onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Monthly Budget</label>
-                    <select
-                      value={contactForm.budget}
-                      onChange={(e) => setContactForm({ ...contactForm, budget: e.target.value })}
-                      className="w-full h-10 p-3 rounded-lg border border-input bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-sm text-foreground dark:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    >
-                      <option value="">Select budget range</option>
-                      <option value="$100 - $250">$100 - $250/month</option>
-                      <option value="$250 - $500">$250 - $500/month</option>
-                      <option value="$500 - $1000">$500 - $1,000/month</option>
-                      <option value="$1000+">$1,000+/month</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Tell us about your advertising goals</label>
-                  <textarea
-                    placeholder="What are you looking to achieve with your advertising campaign?"
-                    value={contactForm.message}
-                    onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
-                    className="w-full min-h-[120px] p-4 rounded-xl border border-input bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-sm text-foreground dark:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary resize-none transition-all"
-                  />
-                </div>
-                <div className="flex justify-center pt-2">
-                  <GlassButton 
-                    type="submit" 
-                    variant="primary" 
-                    size="lg"
-                    rightIcon={<Send className="h-4 w-4" />}
-                    disabled={isSubmitting}
-                    className="min-w-48"
-                  >
-                    {isSubmitting ? 'Submitting...' : 'Contact Our Team'}
-                  </GlassButton>
-                </div>
-              </form>
-            </div>
-          </GlassCard>
         </FadeIn>
 
         {/* Contact Info */}
@@ -727,80 +660,33 @@ export const AdvertisePage: React.FC<AdvertisePageProps> = ({ onBack, onNavigate
         </FadeIn>
       </div>
 
-      {/* Plan Selection Modal */}
-      <GlassModal
-        isOpen={showPlanModal}
-        onClose={() => setShowPlanModal(false)}
-        title={selectedPlanData?.name || 'Select Plan'}
-        description={selectedPlanData?.description}
-        size="lg"
-      >
-        {selectedPlanData && (
-          <div className="space-y-6">
-            {/* Plan summary */}
-            <div className="flex items-center gap-4 p-4 rounded-xl bg-primary/5 border border-primary/10">
-              <div 
-                className="w-16 h-16 rounded-xl flex items-center justify-center"
-                style={{ backgroundColor: `${selectedPlanData.color}20` }}
-              >
-                <selectedPlanData.icon className="h-8 w-8" style={{ color: selectedPlanData.color }} />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold">{selectedPlanData.name}</h3>
-                <p className="text-2xl font-bold gradient-text">{selectedPlanData.price}</p>
-              </div>
-            </div>
-
-            {/* Features */}
-            <div>
-              <h4 className="font-medium mb-3">What&apos;s included:</h4>
-              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {selectedPlanData.features.map((feature) => (
-                  <li key={feature} className="flex items-center gap-2 text-sm">
-                    <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
-                    <span className="text-muted-foreground">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* CTA */}
-            <div className="flex gap-3 justify-end">
-              <GlassButton variant="ghost" onClick={() => setShowPlanModal(false)}>
-                Cancel
-              </GlassButton>
-              <GlassButton 
-                variant="primary" 
-                onClick={handleContinueToForm}
-                rightIcon={<ChevronRight className="h-4 w-4" />}
-              >
-                Continue to Form
-              </GlassButton>
-            </div>
-          </div>
-        )}
-      </GlassModal>
-
       {/* Sign In Prompt Modal */}
-      <GlassModal
+      <LiquidGlassModal
         isOpen={showSignInPrompt}
         onClose={() => setShowSignInPrompt(false)}
-        title="Sign In Required"
-        description="You need to be signed in to subscribe to an advertising plan."
         size="md"
       >
-        <div className="space-y-6">
-          <div className="text-center">
+        <div className="p-6">
+          {/* Close button */}
+          <button
+            onClick={() => setShowSignInPrompt(false)}
+            className="absolute right-4 top-4 rounded-lg p-1 hover:bg-muted transition-colors z-20"
+          >
+            <X className="h-5 w-5" />
+          </button>
+
+          <div className="text-center mb-6">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
               <LogIn className="h-8 w-8 text-primary" />
             </div>
+            <h2 className="text-xl font-semibold mb-2">Sign In Required</h2>
             <p className="text-muted-foreground">
-              Create an account or sign in to start advertising your business on GroomConnect.
+              You need to be signed in to subscribe to an advertising plan.
             </p>
           </div>
           
           {selectedPlanData && (
-            <div className="p-4 rounded-xl bg-muted/50 border border-border">
+            <div className="p-4 rounded-xl bg-muted/50 border border-border mb-6">
               <p className="text-sm text-muted-foreground">Selected Plan:</p>
               <p className="font-semibold">{selectedPlanData.name} - {selectedPlanData.price}</p>
             </div>
@@ -812,7 +698,7 @@ export const AdvertisePage: React.FC<AdvertisePageProps> = ({ onBack, onNavigate
               className="w-full"
               onClick={() => {
                 setShowSignInPrompt(false);
-                onNavigate?.('auth');
+                onNavigate?.('login');
               }}
               leftIcon={<LogIn className="h-4 w-4" />}
             >
@@ -827,28 +713,34 @@ export const AdvertisePage: React.FC<AdvertisePageProps> = ({ onBack, onNavigate
             </GlassButton>
           </div>
         </div>
-      </GlassModal>
+      </LiquidGlassModal>
 
-      {/* Onboarding Prompt Modal for non-providers */}
-      <GlassModal
+      {/* Onboarding Prompt Modal */}
+      <LiquidGlassModal
         isOpen={showOnboardingPrompt}
         onClose={() => setShowOnboardingPrompt(false)}
-        title="Become a Partner"
-        description="You need to register as a service provider to advertise on GroomConnect."
         size="md"
       >
-        <div className="space-y-6">
-          <div className="text-center">
+        <div className="p-6">
+          <button
+            onClick={() => setShowOnboardingPrompt(false)}
+            className="absolute right-4 top-4 rounded-lg p-1 hover:bg-muted transition-colors z-20"
+          >
+            <X className="h-5 w-5" />
+          </button>
+
+          <div className="text-center mb-6">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
               <Building2 className="h-8 w-8 text-primary" />
             </div>
+            <h2 className="text-xl font-semibold mb-2">Become a Partner</h2>
             <p className="text-muted-foreground">
-              Register your business on GroomConnect to start advertising and reaching more customers.
+              You need to register as a service provider to advertise on GroomConnect.
             </p>
           </div>
           
           {selectedPlanData && (
-            <div className="p-4 rounded-xl bg-muted/50 border border-border">
+            <div className="p-4 rounded-xl bg-muted/50 border border-border mb-6">
               <p className="text-sm text-muted-foreground">Selected Plan:</p>
               <p className="font-semibold">{selectedPlanData.name} - {selectedPlanData.price}</p>
             </div>
@@ -875,7 +767,270 @@ export const AdvertisePage: React.FC<AdvertisePageProps> = ({ onBack, onNavigate
             </GlassButton>
           </div>
         </div>
-      </GlassModal>
+      </LiquidGlassModal>
+
+      {/* Payment Modal */}
+      <LiquidGlassModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        size="xl"
+      >
+        <div className="p-6">
+          <button
+            onClick={() => setShowPaymentModal(false)}
+            className="absolute right-4 top-4 rounded-lg p-1 hover:bg-muted transition-colors z-20"
+          >
+            <X className="h-5 w-5" />
+          </button>
+
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold mb-2">Complete Your Subscription</h2>
+            <p className="text-muted-foreground">Subscribe to your advertising plan</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Left - Plan Summary */}
+            <div>
+              {selectedPlanData && (
+                <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 mb-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div 
+                      className="w-12 h-12 rounded-xl flex items-center justify-center"
+                      style={{ backgroundColor: `${selectedPlanData.color}20` }}
+                    >
+                      <selectedPlanData.icon className="h-6 w-6" style={{ color: selectedPlanData.color }} />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">{selectedPlanData.name}</h3>
+                      <p className="text-2xl font-bold gradient-text">{selectedPlanData.price}</p>
+                    </div>
+                  </div>
+                  <ul className="space-y-1 text-sm text-muted-foreground">
+                    {selectedPlanData.features.slice(0, 3).map(feature => (
+                      <li key={feature} className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Payment Summary */}
+              <div className="p-4 rounded-xl bg-muted/30 border border-border">
+                <h4 className="font-medium mb-3">Payment Summary</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Subscription</span>
+                    <span>{selectedPlanData?.price}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Billing cycle</span>
+                    <span>Monthly</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-border">
+                    <span className="font-medium">Total due today</span>
+                    <span className="text-xl font-bold gradient-text">{selectedPlanData?.price}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right - Payment Form */}
+            <div>
+              <h4 className="font-medium mb-3 flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-primary" />
+                Payment Method
+              </h4>
+
+              {/* Payment Method Selection */}
+              <div className="space-y-2 mb-4">
+                {[
+                  { type: 'card' as PaymentMethodType, icon: CreditCard, label: 'Card', color: 'from-blue-500 to-purple-600' },
+                  { type: 'paypal' as PaymentMethodType, icon: Wallet, label: 'PayPal', color: 'from-[#0070ba] to-[#003087]' },
+                  { type: 'mpesa' as PaymentMethodType, icon: Smartphone, label: 'M-Pesa', color: 'from-green-500 to-green-600' },
+                ].map(({ type, icon: Icon, label, color }) => (
+                  <button
+                    key={type}
+                    onClick={() => setPaymentMethod(type)}
+                    className={`w-full p-3 rounded-xl border-2 flex items-center gap-3 transition-all ${
+                      paymentMethod === type
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/50'
+                    }`}
+                  >
+                    <div className={`w-10 h-6 rounded-lg bg-gradient-to-r ${color} flex items-center justify-center`}>
+                      <Icon className="h-4 w-4 text-white" />
+                    </div>
+                    <span className="font-medium">{label}</span>
+                    <div className={`ml-auto w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                      paymentMethod === type ? 'border-primary bg-primary' : 'border-muted-foreground'
+                    }`}>
+                      {paymentMethod === type && <CheckCircle className="h-3 w-3 text-white" />}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Card Form */}
+              {paymentMethod === 'card' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Card Number</label>
+                    <GlassInput
+                      value={cardNumber}
+                      onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
+                      placeholder="1234 5678 9012 3456"
+                      maxLength={19}
+                      leftIcon={<CreditCard className="h-4 w-4" />}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Expiry</label>
+                      <GlassInput
+                        value={expiry}
+                        onChange={(e) => setExpiry(formatExpiry(e.target.value))}
+                        placeholder="MM/YY"
+                        maxLength={5}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">CVV</label>
+                      <GlassInput
+                        type="password"
+                        value={cvv}
+                        onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                        placeholder="•••"
+                        maxLength={4}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Cardholder Name</label>
+                    <GlassInput
+                      value={cardName}
+                      onChange={(e) => setCardName(e.target.value.toUpperCase())}
+                      placeholder="JOHN DOE"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Billing Address</label>
+                    <GlassInput
+                      value={billingAddress}
+                      onChange={(e) => setBillingAddress(e.target.value)}
+                      placeholder="123 Main St, City, State"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {paymentMethod === 'paypal' && (
+                <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-xl">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    You will be redirected to PayPal to complete your payment securely.
+                  </p>
+                </div>
+              )}
+
+              {paymentMethod === 'mpesa' && (
+                <div className="p-4 bg-green-50 dark:bg-green-950/30 rounded-xl">
+                  <p className="text-sm text-green-800 dark:text-green-200">
+                    Enter your M-Pesa number on the next screen to receive a payment prompt.
+                  </p>
+                </div>
+              )}
+
+              {/* Security Notice */}
+              <div className="flex items-center gap-2 mt-4 p-3 bg-muted/30 rounded-lg text-xs text-muted-foreground">
+                <Lock className="h-4 w-4 text-primary" />
+                <span>Secure payment with SSL encryption</span>
+              </div>
+
+              {/* Pay Button */}
+              <GlassButton
+                variant="primary"
+                className="w-full mt-4"
+                size="lg"
+                onClick={handlePayment}
+                disabled={!isFormValid()}
+                isLoading={isProcessing}
+              >
+                {isProcessing ? 'Processing...' : `Subscribe ${selectedPlanData?.price}`}
+              </GlassButton>
+            </div>
+          </div>
+        </div>
+      </LiquidGlassModal>
+
+      {/* Success Modal */}
+      <LiquidGlassModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        size="md"
+      >
+        <div className="p-6 text-center">
+          <button
+            onClick={() => setShowSuccessModal(false)}
+            className="absolute right-4 top-4 rounded-lg p-1 hover:bg-muted transition-colors z-20"
+          >
+            <X className="h-5 w-5" />
+          </button>
+
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+            className="w-20 h-20 rounded-full gradient-bg flex items-center justify-center mx-auto mb-4 shadow-glow"
+          >
+            <CheckCircle className="h-10 w-10 text-white" />
+          </motion.div>
+
+          <h2 className="text-xl font-semibold mb-2">Payment Successful!</h2>
+          <p className="text-muted-foreground mb-6">
+            Your advertising plan is now active. Start reaching more customers today!
+          </p>
+
+          {selectedPlanData && (
+            <div className="p-4 rounded-xl bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 mb-6 text-left">
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{ backgroundColor: `${selectedPlanData.color}20` }}
+                >
+                  <selectedPlanData.icon className="h-5 w-5" style={{ color: selectedPlanData.color }} />
+                </div>
+                <div>
+                  <p className="font-semibold">{selectedPlanData.name}</p>
+                  <p className="text-sm text-muted-foreground">{selectedPlanData.price}/month</p>
+                </div>
+                <GlassBadge variant="success" className="ml-auto">Active</GlassBadge>
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <GlassButton
+              variant="outline"
+              className="flex-1"
+              onClick={() => setShowSuccessModal(false)}
+            >
+              Browse Ads
+            </GlassButton>
+            <GlassButton
+              variant="primary"
+              className="flex-1"
+              onClick={() => {
+                setShowSuccessModal(false);
+                onNavigate?.('dashboard');
+              }}
+              rightIcon={<ChevronRight className="h-4 w-4" />}
+            >
+              View Dashboard
+            </GlassButton>
+          </div>
+        </div>
+      </LiquidGlassModal>
     </div>
   );
 };

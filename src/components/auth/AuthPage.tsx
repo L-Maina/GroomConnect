@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Mail, 
@@ -14,6 +14,8 @@ import {
   Check,
   RefreshCw,
   AlertCircle,
+  CheckCircle,
+  XCircle,
 } from 'lucide-react';
 import { 
   GlassCard, 
@@ -25,6 +27,76 @@ import { PhoneInput } from '@/components/ui/custom/PhoneInput';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store';
 import type { User as UserType } from '@/types';
+
+// ============================================
+// PASSWORD STRENGTH CALCULATOR
+// ============================================
+type PasswordStrength = 'weak' | 'fair' | 'good' | 'strong';
+
+interface PasswordStrengthResult {
+  strength: PasswordStrength;
+  score: number;
+  requirements: {
+    length: boolean;
+    uppercase: boolean;
+    lowercase: boolean;
+    number: boolean;
+    special: boolean;
+  };
+}
+
+function calculatePasswordStrength(password: string): PasswordStrengthResult {
+  const requirements = {
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    number: /[0-9]/.test(password),
+    special: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+  };
+
+  const score = Object.values(requirements).filter(Boolean).length;
+  
+  let strength: PasswordStrength;
+  if (score <= 2) strength = 'weak';
+  else if (score === 3) strength = 'fair';
+  else if (score === 4) strength = 'good';
+  else strength = 'strong';
+
+  return { strength, score, requirements };
+}
+
+// ============================================
+// VALIDATION ERROR MESSAGES
+// ============================================
+const ERROR_MESSAGES: Record<string, string> = {
+  // Auth errors
+  'auth/invalid-email': 'Please enter a valid email address.',
+  'auth/user-disabled': 'This account has been disabled. Please contact support.',
+  'auth/user-not-found': 'No account found with this email. Please sign up.',
+  'auth/wrong-password': 'Incorrect password. Please try again.',
+  'auth/email-already-in-use': 'An account with this email already exists.',
+  'auth/weak-password': 'Password is too weak. Please use a stronger password.',
+  'auth/too-many-requests': 'Too many failed attempts. Please try again later.',
+  'auth/network-error': 'Network error. Please check your connection.',
+  'auth/invalid-credentials': 'Invalid email or password. Please try again.',
+  'auth/session-expired': 'Your session has expired. Please sign in again.',
+  
+  // Validation errors
+  'validation/required': 'This field is required.',
+  'validation/email': 'Please enter a valid email address.',
+  'validation/phone': 'Please enter a valid phone number.',
+  'validation/password-length': 'Password must be at least 8 characters.',
+  'validation/password-strength': 'Password must contain uppercase, lowercase, and numbers.',
+  'validation/name-length': 'Name must be at least 2 characters.',
+  'validation/otp-length': 'Please enter all 6 digits.',
+  
+  // Generic errors
+  'unknown': 'An unexpected error occurred. Please try again.',
+};
+
+function getErrorMessage(code: string): string {
+  return ERROR_MESSAGES[code] || ERROR_MESSAGES['unknown'];
+}
 
 interface AuthPageProps {
   mode: 'login' | 'register';
@@ -49,6 +121,84 @@ const GoogleIcon = () => (
   </svg>
 );
 
+// ============================================
+// FORM VALIDATION INTERFACE
+// ============================================
+interface FormErrors {
+  email?: string;
+  password?: string;
+  name?: string;
+  phone?: string;
+}
+
+// ============================================
+// PASSWORD STRENGTH INDICATOR COMPONENT
+// ============================================
+const PasswordStrengthIndicator: React.FC<{ password: string }> = React.memo(({ password }) => {
+  const { strength, score, requirements } = useMemo(() => 
+    calculatePasswordStrength(password), [password]
+  );
+
+  if (!password) return null;
+
+  const strengthColors: Record<PasswordStrength, string> = {
+    weak: 'bg-red-500',
+    fair: 'bg-orange-500',
+    good: 'bg-yellow-500',
+    strong: 'bg-green-500',
+  };
+
+  const strengthLabels: Record<PasswordStrength, string> = {
+    weak: 'Weak',
+    fair: 'Fair',
+    good: 'Good',
+    strong: 'Strong',
+  };
+
+  return (
+    <div className="mt-2 space-y-2" role="status" aria-live="polite">
+      {/* Strength bar */}
+      <div className="flex items-center gap-2">
+        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+          <div 
+            className={cn('h-full transition-all duration-300', strengthColors[strength])}
+            style={{ width: `${(score / 5) * 100}%` }}
+            aria-label={`Password strength: ${strengthLabels[strength]}`}
+          />
+        </div>
+        <span className={cn('text-xs font-medium', 
+          strength === 'weak' && 'text-red-500',
+          strength === 'fair' && 'text-orange-500',
+          strength === 'good' && 'text-yellow-500',
+          strength === 'strong' && 'text-green-500'
+        )}>
+          {strengthLabels[strength]}
+        </span>
+      </div>
+      
+      {/* Requirements checklist */}
+      <div className="grid grid-cols-2 gap-1 text-xs">
+        <RequirementMet met={requirements.length} label="8+ characters" />
+        <RequirementMet met={requirements.uppercase} label="Uppercase" />
+        <RequirementMet met={requirements.lowercase} label="Lowercase" />
+        <RequirementMet met={requirements.number} label="Number" />
+        <RequirementMet met={requirements.special} label="Special char" />
+      </div>
+    </div>
+  );
+});
+PasswordStrengthIndicator.displayName = 'PasswordStrengthIndicator';
+
+// ============================================
+// REQUIREMENT MET COMPONENT
+// ============================================
+const RequirementMet: React.FC<{ met: boolean; label: string }> = ({ met, label }) => (
+  <div className={cn('flex items-center gap-1', met ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground')}>
+    {met ? <CheckCircle className="h-3 w-3" aria-hidden="true" /> : <XCircle className="h-3 w-3" aria-hidden="true" />}
+    <span>{label}</span>
+  </div>
+);
+
 export const AuthPage: React.FC<AuthPageProps> = ({
   mode,
   onLogin,
@@ -60,13 +210,17 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState(1);
   const [error, setError] = useState('');
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   // Form states
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  // Role is no longer selected during registration - users switch modes after login
+  const [rememberMe, setRememberMe] = useState(false);
+  
+  // Field-level validation errors
+  const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
   
   // OTP states
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -74,6 +228,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [otpTimer, setOtpTimer] = useState(60);
   const [isOtpSent, setIsOtpSent] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const formRef = useRef<HTMLFormElement>(null);
 
   // Derive canResend from otpTimer instead of separate state
   const canResend = otpTimer === 0 && step === 2;
@@ -90,23 +245,77 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   useEffect(() => {
     setError('');
     setOtpError('');
+    setFieldErrors({});
+    setTouched({});
   }, [currentMode, step]);
 
   // Validate email
-  const isValidEmail = (emailStr: string) => {
+  const isValidEmail = useCallback((emailStr: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr);
-  };
+  }, []);
 
   // Validate phone (basic validation)
-  const isValidPhone = (phoneStr: string) => {
+  const isValidPhone = useCallback((phoneStr: string) => {
     const cleaned = phoneStr.replace(/\D/g, '');
     return cleaned.length >= 10;
-  };
+  }, []);
 
-  // Validate password
-  const isValidPassword = (pwd: string) => {
-    return pwd.length >= 6;
-  };
+  // Validate password - updated to match registration requirements
+  const isValidPassword = useCallback((pwd: string) => {
+    return pwd.length >= 8 && /[A-Z]/.test(pwd) && /[a-z]/.test(pwd) && /[0-9]/.test(pwd);
+  }, []);
+
+  // Validate single field
+  const validateField = useCallback((field: string, value: string): string | undefined => {
+    switch (field) {
+      case 'email':
+        if (!value) return getErrorMessage('validation/required');
+        if (!isValidEmail(value)) return getErrorMessage('validation/email');
+        break;
+      case 'password':
+        if (!value) return getErrorMessage('validation/required');
+        if (value.length < 8) return getErrorMessage('validation/password-length');
+        break;
+      case 'name':
+        if (!value) return getErrorMessage('validation/required');
+        if (value.length < 2) return getErrorMessage('validation/name-length');
+        break;
+      case 'phone':
+        if (!value) return getErrorMessage('validation/required');
+        if (!isValidPhone(value)) return getErrorMessage('validation/phone');
+        break;
+    }
+    return undefined;
+  }, [isValidEmail, isValidPhone]);
+
+  // Handle field blur for validation
+  const handleFieldBlur = useCallback((field: string, value: string) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+    const fieldError = validateField(field, value);
+    setFieldErrors(prev => ({ ...prev, [field]: fieldError }));
+  }, [validateField]);
+
+  // Handle field change with optional real-time validation
+  const handleFieldChange = useCallback((field: string, value: string, validate: boolean = false) => {
+    // Update the field value
+    switch (field) {
+      case 'email': setEmail(value); break;
+      case 'password': setPassword(value); break;
+      case 'name': setName(value); break;
+      case 'phone': setPhone(value); break;
+    }
+    
+    // Clear error on change
+    if (fieldErrors[field as keyof FormErrors]) {
+      setFieldErrors(prev => ({ ...prev, [field]: undefined }));
+    }
+    
+    // Validate if field was touched
+    if (touched[field] || validate) {
+      const fieldError = validateField(field, value);
+      setFieldErrors(prev => ({ ...prev, [field]: fieldError }));
+    }
+  }, [fieldErrors, touched, validateField]);
 
   // Handle sign in - preserve role from existing account or check for business owner email
   const handleLogin = async () => {
@@ -480,66 +689,108 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
             {/* Login Form */}
             {currentMode === 'login' && step === 1 && (
-              <motion.div
+              <motion.form
+                ref={formRef}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 className="space-y-4"
+                onSubmit={(e) => { e.preventDefault(); handleLogin(); }}
+                aria-label="Sign in form"
+                noValidate
               >
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Email</label>
+                  <label htmlFor="login-email" className="text-sm font-medium mb-2 block">
+                    Email <span className="text-destructive" aria-hidden="true">*</span>
+                  </label>
                   <GlassInput
+                    id="login-email"
                     type="email"
                     placeholder="Enter your email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => handleFieldChange('email', e.target.value)}
+                    onBlur={() => handleFieldBlur('email', email)}
                     onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                    leftIcon={<Mail className="h-4 w-4" />}
+                    leftIcon={<Mail className="h-4 w-4" aria-hidden="true" />}
+                    error={touched.email ? fieldErrors.email : undefined}
+                    aria-invalid={touched.email && !!fieldErrors.email}
+                    aria-describedby={touched.email && fieldErrors.email ? 'email-error' : undefined}
+                    autoComplete="email"
+                    required
                   />
+                  {touched.email && fieldErrors.email && (
+                    <p id="email-error" className="sr-only" role="alert">{fieldErrors.email}</p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Password</label>
+                  <label htmlFor="login-password" className="text-sm font-medium mb-2 block">
+                    Password <span className="text-destructive" aria-hidden="true">*</span>
+                  </label>
                   <div className="relative">
                     <GlassInput
+                      id="login-password"
                       type={showPassword ? 'text' : 'password'}
                       placeholder="Enter your password"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) => handleFieldChange('password', e.target.value)}
+                      onBlur={() => handleFieldBlur('password', password)}
                       onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                      leftIcon={<Lock className="h-4 w-4" />}
+                      leftIcon={<Lock className="h-4 w-4" aria-hidden="true" />}
+                      error={touched.password ? fieldErrors.password : undefined}
+                      aria-invalid={touched.password && !!fieldErrors.password}
+                      aria-describedby={touched.password && fieldErrors.password ? 'password-error' : undefined}
+                      autoComplete="current-password"
+                      required
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                     </button>
                   </div>
+                  {touched.password && fieldErrors.password && (
+                    <p id="password-error" className="sr-only" role="alert">{fieldErrors.password}</p>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between text-sm">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" className="rounded border-input accent-primary" />
-                    Remember me
+                  <label htmlFor="remember-me" className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      id="remember-me"
+                      type="checkbox" 
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="rounded border-input accent-primary" 
+                      aria-describedby="remember-me-desc"
+                    />
+                    <span>Remember me</span>
                   </label>
-                  <button type="button" className="text-primary hover:underline">
+                  <span id="remember-me-desc" className="sr-only">Keep me signed in on this device</span>
+                  <button 
+                    type="button" 
+                    onClick={() => onNavigate?.('forgot-password')} 
+                    className="text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded"
+                  >
                     Forgot password?
                   </button>
                 </div>
 
                 <GlassButton
+                  type="submit"
                   variant="primary"
                   size="lg"
                   className="w-full"
-                  onClick={handleLogin}
                   isLoading={isLoading}
+                  aria-busy={isLoading}
                 >
                   Sign In
-                  <ArrowRight className="h-4 w-4 ml-2" />
+                  <ArrowRight className="h-4 w-4 ml-2" aria-hidden="true" />
                 </GlassButton>
 
-                <div className="relative my-6">
+                <div className="relative my-6" role="separator" aria-label="Or continue with">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-border"></div>
                   </div>
@@ -548,115 +799,187 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-3" role="group" aria-label="Social sign in options">
                   <GlassButton 
+                    type="button"
                     variant="default" 
                     className="w-full"
                     onClick={() => handleSocialSignIn('google')}
                     disabled={isLoading}
+                    aria-label="Sign in with Google"
                   >
                     <GoogleIcon />
                   </GlassButton>
                   <GlassButton 
+                    type="button"
                     variant="default" 
                     className="w-full"
                     onClick={() => handleSocialSignIn('apple')}
                     disabled={isLoading}
+                    aria-label="Sign in with Apple"
                   >
                     <AppleIcon />
                   </GlassButton>
                   <GlassButton 
+                    type="button"
                     variant="default" 
                     className="w-full"
                     onClick={() => handleSocialSignIn('phone')}
                     disabled={isLoading}
+                    aria-label="Sign in with phone"
                   >
-                    <Phone className="h-5 w-5" />
+                    <Phone className="h-5 w-5" aria-hidden="true" />
                   </GlassButton>
                 </div>
-              </motion.div>
+              </motion.form>
             )}
 
             {/* Register Form - Step 1 */}
             {currentMode === 'register' && step === 1 && (
-              <motion.div
+              <motion.form
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 className="space-y-4"
+                onSubmit={(e) => { e.preventDefault(); handleContinueToOtp(); }}
+                aria-label="Create account form"
+                noValidate
               >
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Full Name</label>
+                  <label htmlFor="register-name" className="text-sm font-medium mb-2 block">
+                    Full Name <span className="text-destructive" aria-hidden="true">*</span>
+                  </label>
                   <GlassInput
+                    id="register-name"
                     type="text"
                     placeholder="Enter your name"
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    leftIcon={<User className="h-4 w-4" />}
+                    onChange={(e) => handleFieldChange('name', e.target.value)}
+                    onBlur={() => handleFieldBlur('name', name)}
+                    leftIcon={<User className="h-4 w-4" aria-hidden="true" />}
+                    error={touched.name ? fieldErrors.name : undefined}
+                    aria-invalid={touched.name && !!fieldErrors.name}
+                    aria-describedby={touched.name && fieldErrors.name ? 'name-error' : undefined}
+                    autoComplete="name"
+                    required
                   />
+                  {touched.name && fieldErrors.name && (
+                    <p id="name-error" className="sr-only" role="alert">{fieldErrors.name}</p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Email</label>
+                  <label htmlFor="register-email" className="text-sm font-medium mb-2 block">
+                    Email <span className="text-destructive" aria-hidden="true">*</span>
+                  </label>
                   <GlassInput
+                    id="register-email"
                     type="email"
                     placeholder="Enter your email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    leftIcon={<Mail className="h-4 w-4" />}
+                    onChange={(e) => handleFieldChange('email', e.target.value)}
+                    onBlur={() => handleFieldBlur('email', email)}
+                    leftIcon={<Mail className="h-4 w-4" aria-hidden="true" />}
+                    error={touched.email ? fieldErrors.email : undefined}
+                    aria-invalid={touched.email && !!fieldErrors.email}
+                    aria-describedby={touched.email && fieldErrors.email ? 'register-email-error' : undefined}
+                    autoComplete="email"
+                    required
                   />
+                  {touched.email && fieldErrors.email && (
+                    <p id="register-email-error" className="sr-only" role="alert">{fieldErrors.email}</p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Phone Number</label>
+                  <label htmlFor="register-phone" className="text-sm font-medium mb-2 block">
+                    Phone Number <span className="text-destructive" aria-hidden="true">*</span>
+                  </label>
                   <PhoneInput
+                    id="register-phone"
                     value={phone}
-                    onChange={(value) => setPhone(value)}
+                    onChange={(value) => handleFieldChange('phone', value)}
+                    onBlur={() => handleFieldBlur('phone', phone)}
                     placeholder="+254 7XX XXX XXX"
+                    aria-invalid={touched.phone && !!fieldErrors.phone}
+                    aria-describedby={touched.phone && fieldErrors.phone ? 'phone-error' : 'phone-hint'}
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Auto-formatted with country code • We&apos;ll send you a verification code
-                  </p>
+                  {touched.phone && fieldErrors.phone ? (
+                    <p id="phone-error" className="text-xs text-destructive mt-1" role="alert">{fieldErrors.phone}</p>
+                  ) : (
+                    <p id="phone-hint" className="text-xs text-muted-foreground mt-1">
+                      Auto-formatted with country code • We&apos;ll send you a verification code
+                    </p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Password</label>
+                  <label htmlFor="register-password" className="text-sm font-medium mb-2 block">
+                    Password <span className="text-destructive" aria-hidden="true">*</span>
+                  </label>
                   <div className="relative">
                     <GlassInput
+                      id="register-password"
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="Create a password (min 6 characters)"
+                      placeholder="Create a strong password"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      leftIcon={<Lock className="h-4 w-4" />}
+                      onChange={(e) => handleFieldChange('password', e.target.value)}
+                      onBlur={() => handleFieldBlur('password', password)}
+                      leftIcon={<Lock className="h-4 w-4" aria-hidden="true" />}
+                      error={touched.password ? fieldErrors.password : undefined}
+                      aria-invalid={touched.password && !!fieldErrors.password}
+                      aria-describedby={touched.password && fieldErrors.password ? 'register-password-error' : 'password-requirements'}
+                      autoComplete="new-password"
+                      required
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                     </button>
+                  </div>
+                  {touched.password && fieldErrors.password && (
+                    <p id="register-password-error" className="sr-only" role="alert">{fieldErrors.password}</p>
+                  )}
+                  <div id="password-requirements">
+                    <PasswordStrengthIndicator password={password} />
                   </div>
                 </div>
 
                 <GlassButton
+                  type="submit"
                   variant="primary"
                   size="lg"
                   className="w-full"
-                  onClick={handleContinueToOtp}
                   isLoading={isLoading}
                   disabled={!name || !email || !phone || !password}
+                  aria-busy={isLoading}
                 >
                   Continue
-                  <ArrowRight className="h-4 w-4 ml-2" />
+                  <ArrowRight className="h-4 w-4 ml-2" aria-hidden="true" />
                 </GlassButton>
 
                 <p className="text-center text-sm text-muted-foreground">
                   By creating an account, you agree to our{' '}
-                  <button type="button" className="text-primary hover:underline">Terms of Service</button>
+                  <button 
+                    type="button" 
+                    onClick={() => onNavigate?.('terms')} 
+                    className="text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded"
+                  >
+                    Terms of Service
+                  </button>
                   {' '}and{' '}
-                  <button type="button" className="text-primary hover:underline">Privacy Policy</button>
+                  <button 
+                    type="button" 
+                    onClick={() => onNavigate?.('privacy')} 
+                    className="text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded"
+                  >
+                    Privacy Policy
+                  </button>
                 </p>
-              </motion.div>
+              </motion.form>
             )}
 
             {/* OTP Verification - Step 2 */}
@@ -666,12 +989,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 animate={{ opacity: 1, x: 0 }}
                 className="space-y-4"
                 onKeyDown={handleOTPKeyDownGlobal}
+                role="form"
+                aria-label="Phone verification"
               >
                 <div className="text-center mb-6">
                   <motion.div 
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     className="w-16 h-16 rounded-full gradient-bg flex items-center justify-center mx-auto mb-4 shadow-glow"
+                    aria-hidden="true"
                   >
                     <Phone className="h-8 w-8 text-white" />
                   </motion.div>
@@ -683,7 +1009,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 </div>
 
                 {/* OTP Input */}
-                <div className="flex justify-center gap-2 mb-6">
+                <div 
+                  className="flex justify-center gap-2 mb-6" 
+                  role="group" 
+                  aria-label="Enter 6-digit verification code"
+                >
                   {otp.map((digit, index) => (
                     <motion.input
                       key={index}
@@ -707,6 +1037,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                           : 'border-input hover:border-primary/30',
                         otpError && 'border-destructive'
                       )}
+                      aria-label={`Digit ${index + 1} of 6`}
+                      aria-invalid={!!otpError}
                     />
                   ))}
                 </div>
@@ -717,6 +1049,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="text-center text-sm text-destructive"
+                    role="alert"
+                    aria-live="assertive"
                   >
                     {otpError}
                   </motion.p>
@@ -726,17 +1060,19 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 <div className="text-center">
                   {canResend ? (
                     <GlassButton
+                      type="button"
                       variant="ghost"
                       size="sm"
                       onClick={handleResendOtp}
                       disabled={isLoading}
                       className="gap-2"
+                      aria-label="Resend verification code"
                     >
-                      <RefreshCw className="h-4 w-4" />
+                      <RefreshCw className="h-4 w-4" aria-hidden="true" />
                       Resend Code
                     </GlassButton>
                   ) : (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground" aria-live="polite">
                       Resend code in <span className="font-medium text-foreground">{otpTimer}s</span>
                     </p>
                   )}
@@ -748,24 +1084,27 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 </p>
 
                 <GlassButton
+                  type="button"
                   variant="primary"
                   size="lg"
                   className="w-full"
                   onClick={() => handleVerifyOtp(otp.join(''))}
                   isLoading={isLoading}
                   disabled={otp.some(d => d === '')}
+                  aria-busy={isLoading}
                 >
-                  <Check className="h-4 w-4 mr-2" />
+                  <Check className="h-4 w-4 mr-2" aria-hidden="true" />
                   Verify & Create Account
                 </GlassButton>
 
                 <GlassButton
+                  type="button"
                   variant="ghost"
                   size="lg"
                   className="w-full"
                   onClick={() => setStep(1)}
                 >
-                  <ChevronLeft className="h-4 w-4 mr-2" />
+                  <ChevronLeft className="h-4 w-4 mr-2" aria-hidden="true" />
                   Back
                 </GlassButton>
               </motion.div>

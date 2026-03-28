@@ -744,6 +744,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'ov
   } = useAdminStore();
   const { businesses } = useBusinessStore();
   
+  // CRITICAL: Role-based access control - only ADMIN can access
+  const isAdmin = user?.roles?.includes('ADMIN') || user?.role === 'ADMIN';
+  
   // Mock users data - with dual roles support
   const mockUsers = [
     { id: 'u1', name: 'John Doe', email: 'john@example.com', role: 'CUSTOMER', roles: ['CUSTOMER'], status: 'ACTIVE', joinedAt: new Date('2024-01-15'), totalSpent: 350 },
@@ -938,6 +941,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'ov
       fetchTabData();
     }
   }, [activeTab, dataFetched]);
+
+  // Early return AFTER all hooks
+  if (!user || !isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center py-8 px-4">
+        <GlassCard className="p-8 text-center max-w-md">
+          <Shield className="h-16 w-16 text-primary mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
+          <p className="text-muted-foreground mb-4">
+            You need admin privileges to access this dashboard.
+          </p>
+          <GlassButton variant="primary" onClick={() => window.location.href = '/'}>
+            Go to Home
+          </GlassButton>
+        </GlassCard>
+      </div>
+    );
+  }
 
   // Use API data when available, fallback to sample/mock data
   const displayUsers = apiUsers.length > 0 ? apiUsers : usersList;
@@ -1565,7 +1586,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'ov
         {activeTab === 'disputes' && (
           <FadeIn delay={0.3}>
             <div className="space-y-4">
-              {disputes.map((dispute) => (
+              {displayDisputes.map((dispute) => (
                 <GlassCard key={dispute.id} className="p-6">
                   <div className="flex flex-col lg:flex-row lg:items-start gap-4">
                     <div className="flex-1">
@@ -1675,7 +1696,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'ov
         {activeTab === 'listings' && (
           <FadeIn delay={0.3}>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {premiumListings.map((listing) => (
+              {displayListings.map((listing) => (
                 <GlassCard key={listing.id} className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">

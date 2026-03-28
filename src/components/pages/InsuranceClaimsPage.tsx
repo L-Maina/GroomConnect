@@ -11,7 +11,6 @@ import {
   Clock,
   DollarSign,
   MessageSquare,
-  ChevronRight,
   User,
   Building2,
   Phone,
@@ -22,8 +21,6 @@ import {
   X,
   Info,
   FileCheck,
-  Claim,
-  AlertTriangle,
 } from 'lucide-react';
 import { 
   GlassCard, 
@@ -141,10 +138,8 @@ const statusLabels: Record<ClaimStatus, string> = {
 
 export const InsuranceClaimsPage: React.FC<InsuranceClaimsPageProps> = ({ onBack, onNavigate }) => {
   const { isAuthenticated, user } = useAuthStore();
-  const [userType, setUserType] = useState<UserType>('customer');
   const [selectedClaim, setSelectedClaim] = useState<ClaimData | null>(null);
   const [showNewClaimModal, setShowNewClaimModal] = useState(false);
-  const [showSignInPrompt, setShowSignInPrompt] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -156,13 +151,11 @@ export const InsuranceClaimsPage: React.FC<InsuranceClaimsPageProps> = ({ onBack
     attachments: [] as File[],
   });
 
+  // Determine user type based on user's role
+  const userType: UserType = user?.role === 'PROVIDER' ? 'provider' : 'customer';
   const claims = userType === 'customer' ? sampleCustomerClaims : sampleProviderClaims;
 
   const handleNewClaimClick = () => {
-    if (!isAuthenticated) {
-      setShowSignInPrompt(true);
-      return;
-    }
     setShowNewClaimModal(true);
   };
 
@@ -252,37 +245,58 @@ export const InsuranceClaimsPage: React.FC<InsuranceClaimsPageProps> = ({ onBack
           </div>
         </FadeIn>
         
-        {/* User Type Toggle */}
-        <FadeIn className="mb-8">
-          <div className="flex justify-center">
-            <div className="inline-flex items-center p-1 rounded-xl bg-muted/50 backdrop-blur-sm border border-border">
-              <button
-                onClick={() => setUserType('customer')}
-                className={cn(
-                  'flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-medium transition-all',
-                  userType === 'customer'
-                    ? 'bg-primary text-white shadow-lg'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-                )}
-              >
-                <User className="h-4 w-4" />
-                Customer Claims
-              </button>
-              <button
-                onClick={() => setUserType('provider')}
-                className={cn(
-                  'flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-medium transition-all',
-                  userType === 'provider'
-                    ? 'bg-primary text-white shadow-lg'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-                )}
-              >
-                <Building2 className="h-4 w-4" />
-                Provider Claims
-              </button>
-            </div>
-          </div>
-        </FadeIn>
+        {/* Guest Restriction - Show sign-in prompt if not authenticated */}
+        {!isAuthenticated ? (
+          <FadeIn delay={0.1}>
+            <GlassCard variant="elevated" className="max-w-lg mx-auto text-center p-8">
+              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
+                <Shield className="h-10 w-10 text-primary" />
+              </div>
+              <h2 className="text-xl font-semibold mb-3">Sign In Required</h2>
+              <p className="text-muted-foreground mb-6">
+                You need to be signed in to view and manage your insurance claims. 
+                Create an account or sign in to access this feature.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <GlassButton 
+                  variant="primary" 
+                  onClick={() => onNavigate?.('login')}
+                  leftIcon={<User className="h-4 w-4" />}
+                >
+                  Sign In / Sign Up
+                </GlassButton>
+                <GlassButton 
+                  variant="outline" 
+                  onClick={() => onNavigate?.('home')}
+                >
+                  Go Home
+                </GlassButton>
+              </div>
+            </GlassCard>
+          </FadeIn>
+        ) : (
+          <>
+            {/* User Type Badge - Auto-detected based on role */}
+            <FadeIn className="mb-6">
+              <div className="flex justify-center">
+                <GlassBadge 
+                  variant="primary" 
+                  className="flex items-center gap-2 px-4 py-2"
+                >
+                  {userType === 'customer' ? (
+                    <>
+                      <User className="h-4 w-4" />
+                      Customer Claims
+                    </>
+                  ) : (
+                    <>
+                      <Building2 className="h-4 w-4" />
+                      Provider Claims
+                    </>
+                  )}
+                </GlassBadge>
+              </div>
+            </FadeIn>
 
         {/* Info Card */}
         <FadeIn delay={0.1}>
@@ -501,6 +515,8 @@ export const InsuranceClaimsPage: React.FC<InsuranceClaimsPageProps> = ({ onBack
             </div>
           </div>
         </FadeIn>
+          </>
+        )}
       </div>
 
       {/* New Claim Modal */}
@@ -765,47 +781,6 @@ export const InsuranceClaimsPage: React.FC<InsuranceClaimsPageProps> = ({ onBack
             </div>
           </div>
         )}
-      </GlassModal>
-
-      {/* Sign In Prompt Modal */}
-      <GlassModal
-        isOpen={showSignInPrompt}
-        onClose={() => setShowSignInPrompt(false)}
-        title="Sign In Required"
-        description="You need to be signed in to file an insurance claim."
-        size="md"
-      >
-        <div className="space-y-6">
-          <div className="text-center">
-            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-              <Shield className="h-8 w-8 text-primary" />
-            </div>
-            <p className="text-muted-foreground">
-              Create an account or sign in to file insurance claims and track their status.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <GlassButton 
-              variant="primary" 
-              className="w-full"
-              onClick={() => {
-                setShowSignInPrompt(false);
-                onNavigate?.('auth');
-              }}
-              leftIcon={<User className="h-4 w-4" />}
-            >
-              Sign In / Sign Up
-            </GlassButton>
-            <GlassButton 
-              variant="ghost" 
-              className="w-full"
-              onClick={() => setShowSignInPrompt(false)}
-            >
-              Maybe Later
-            </GlassButton>
-          </div>
-        </div>
       </GlassModal>
     </div>
   );

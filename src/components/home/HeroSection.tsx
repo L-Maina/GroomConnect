@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, MapPin, Star, Clock, Shield, Users, Navigation } from 'lucide-react';
+import { Search, MapPin, Star, Clock, Shield, Users } from 'lucide-react';
 import { 
   GlassButton, 
   FadeIn, 
@@ -206,29 +206,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   />
                   
                   {/* Location Input */}
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <LocationAutocomplete
-                        value={locationText}
-                        onChange={handleLocationChange}
-                        placeholder="Search location..."
-                        className="w-full"
-                      />
-                    </div>
-                    <GlassButton
-                      variant="outline"
-                      onClick={handleNearMe}
-                      disabled={isDetectingLocation}
-                      className="shrink-0"
-                      title="Use my location"
-                    >
-                      {isDetectingLocation ? (
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                      ) : (
-                        <Navigation className="h-4 w-4" />
-                      )}
-                    </GlassButton>
-                  </div>
+                  <LocationAutocomplete
+                    value={locationText}
+                    onChange={handleLocationChange}
+                    placeholder="Search location..."
+                    className="w-full"
+                  />
                   
                   {/* Search Button */}
                   <GlassButton

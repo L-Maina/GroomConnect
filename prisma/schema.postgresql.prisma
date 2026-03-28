@@ -1,0 +1,407 @@
+// GroomConnect Database Schema - PostgreSQL (for Vercel/Production)
+// Multi-tenant grooming marketplace
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  phone         String?   @unique
+  password      String?
+  name          String?
+  avatar        String?
+  role          UserRole  @default(CUSTOMER)
+  emailVerified DateTime?
+  phoneVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  business            Business?
+  bookings            Booking[]
+  payments            Payment[]
+  notifications       Notification[]
+  reviews             Review[]
+  favorites           Favorite[]
+  sentMessages        ChatMessage[]  @relation("SenderMessages")
+  receivedMessages    ChatMessage[]  @relation("ReceiverMessages")
+  conversations       Conversation[] @relation("UserConversations")
+}
+
+enum UserRole {
+  CUSTOMER
+  BUSINESS_OWNER
+  ADMIN
+}
+
+// ============================================
+// BUSINESS
+// ============================================
+
+model Business {
+  id              String            @id @default(cuid())
+  ownerId         String            @unique
+  name            String
+  slug            String            @unique
+  description     String?
+  logo            String?
+  coverImage      String?
+  phone           String?
+  email           String?
+  website         String?
+  address         String?
+  city            String?
+  country         String?
+  latitude        Float?
+  longitude       Float?
+  serviceRadius   Float             @default(10.0) // km
+  verificationStatus VerificationStatus @default(PENDING)
+  subscriptionPlan SubscriptionPlan  @default(FREE)
+  rating          Float             @default(0)
+  reviewCount     Int               @default(0)
+  totalEarnings   Float             @default(0)
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relations
+  owner           User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  services        Service[]
+  staff           Staff[]
+  portfolio       PortfolioItem[]
+  bookings        Booking[]
+  reviews         Review[]
+  favorites       Favorite[]
+  conversations   Conversation[]
+
+  @@index([latitude, longitude])
+  @@index([city])
+  @@index([verificationStatus])
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum SubscriptionPlan {
+  FREE
+  PREMIUM
+  FEATURED
+}
+
+// ============================================
+// SERVICES
+// ============================================
+
+model Service {
+  id          String    @id @default(cuid())
+  businessId  String
+  name        String
+  description String?
+  category    String
+  duration    Int       // minutes
+  price       Float
+  discountPrice Float?
+  imageUrl    String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  bookings    Booking[]
+  timeSlots   TimeSlot[]
+
+  @@index([category])
+}
+
+model TimeSlot {
+  id        String    @id @default(cuid())
+  serviceId String
+  date      String    // YYYY-MM-DD
+  startTime String    // HH:mm
+  endTime   String    // HH:mm
+  isBooked  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  // Relations
+  service   Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceId, date, startTime])
+}
+
+// ============================================
+// STAFF
+// ============================================
+
+model Staff {
+  id          String    @id @default(cuid())
+  businessId  String
+  name        String
+  avatar      String?
+  role        String    // barber, stylist, nail_technician, etc.
+  bio         String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  bookings    Booking[]
+
+  @@index([role])
+}
+
+// ============================================
+// PORTFOLIO
+// ============================================
+
+model PortfolioItem {
+  id          String      @id @default(cuid())
+  businessId  String
+  mediaType   MediaType
+  fileUrl     String
+  thumbnailUrl String?
+  caption     String?
+  tags        String?     // JSON array of tags
+  isFeatured  Boolean     @default(false)
+  likes       Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  business    Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([mediaType])
+  @@index([isFeatured])
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+// ============================================
+// BOOKINGS
+// ============================================
+
+model Booking {
+  id          String        @id @default(cuid())
+  customerId  String
+  businessId  String
+  serviceId   String
+  staffId     String?
+  date        String        // YYYY-MM-DD
+  startTime   String        // HH:mm
+  endTime     String        // HH:mm
+  status      BookingStatus @default(PENDING)
+  notes       String?
+  totalAmount Float
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  customer    User          @relation(fields: [customerId], references: [id])
+  business    Business      @relation(fields: [businessId], references: [id])
+  service     Service       @relation(fields: [serviceId], references: [id])
+  staff       Staff?        @relation(fields: [staffId], references: [id])
+  payment     Payment?
+  review      Review?
+
+  @@index([customerId])
+  @@index([businessId])
+  @@index([status])
+  @@index([date])
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+// ============================================
+// PAYMENTS
+// ============================================
+
+model Payment {
+  id            String        @id @default(cuid())
+  bookingId     String        @unique
+  userId        String
+  amount        Float
+  currency      String        @default("USD")
+  paymentMethod PaymentMethod
+  status        PaymentStatus @default(PENDING)
+  transactionId String?
+  metadata      String?       // JSON for additional payment details
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  booking       Booking       @relation(fields: [bookingId], references: [id])
+  user          User          @relation(fields: [userId], references: [id])
+
+  @@index([status])
+  @@index([paymentMethod])
+}
+
+enum PaymentMethod {
+  STRIPE
+  PAYPAL
+  MPESA
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+// ============================================
+// REVIEWS
+// ============================================
+
+model Review {
+  id          String    @id @default(cuid())
+  customerId  String
+  businessId  String
+  bookingId   String    @unique
+  rating      Int       // 1-5
+  comment     String?
+  isVerified  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  customer    User      @relation(fields: [customerId], references: [id])
+  business    Business  @relation(fields: [businessId], references: [id])
+  booking     Booking   @relation(fields: [bookingId], references: [id])
+
+  @@index([rating])
+  @@index([businessId])
+}
+
+// ============================================
+// FAVORITES
+// ============================================
+
+model Favorite {
+  id          String    @id @default(cuid())
+  userId      String
+  businessId  String
+  createdAt   DateTime  @default(now())
+
+  // Relations
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, businessId])
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+model Notification {
+  id          String            @id @default(cuid())
+  userId      String
+  title       String
+  message     String
+  type        NotificationType
+  data        String?           // JSON for additional data
+  isRead      Boolean           @default(false)
+  createdAt   DateTime          @default(now())
+
+  // Relations
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([type])
+}
+
+enum NotificationType {
+  BOOKING_CONFIRMED
+  BOOKING_CANCELLED
+  BOOKING_REMINDER
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  NEW_MESSAGE
+  NEW_REVIEW
+  SYSTEM_ALERT
+  VERIFICATION_UPDATE
+}
+
+// ============================================
+// CHAT / MESSAGING
+// ============================================
+
+model Conversation {
+  id            String        @id @default(cuid())
+  businessId    String
+  customerId    String
+  lastMessage   String?
+  lastMessageAt DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  business      Business      @relation(fields: [businessId], references: [id])
+  customer      User          @relation("UserConversations", fields: [customerId], references: [id])
+  messages      ChatMessage[]
+
+  @@unique([businessId, customerId])
+}
+
+model ChatMessage {
+  id             String        @id @default(cuid())
+  conversationId String
+  senderId       String
+  receiverId     String
+  content        String
+  isRead         Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+
+  // Relations
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User          @relation("SenderMessages", fields: [senderId], references: [id])
+  receiver       User          @relation("ReceiverMessages", fields: [receiverId], references: [id])
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([receiverId, isRead])
+}
+
+// ============================================
+// OTP VERIFICATION
+// ============================================
+
+model OTPVerification {
+  id        String    @id @default(cuid())
+  phone     String
+  code      String
+  expiresAt DateTime
+  isUsed    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  @@index([phone, code])
+}

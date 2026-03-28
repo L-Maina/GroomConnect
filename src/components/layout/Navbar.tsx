@@ -948,7 +948,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage = 'home', onNavigate
                               <MenuItem
                                 icon={HelpCircle}
                                 label="Help & Support"
-                                onClick={() => {}}
+                                onClick={() => handleNavigate('support')}
                               />
 
                               <div className="border-t border-border/50 my-1" />
