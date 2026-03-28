@@ -576,9 +576,9 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = ({
 
         {/* Filter Bar */}
         <FadeIn delay={0.15}>
-          <div className="flex items-center gap-3 mb-4 overflow-visible">
+          <div className="flex items-center gap-3 mb-4">
             {/* Left: Filter Buttons */}
-            <div className="flex items-center gap-2 flex-1 flex-nowrap overflow-visible lg:overflow-visible overflow-x-auto scrollbar-hide pb-1">
+            <div className="flex items-center gap-2 flex-1 flex-nowrap overflow-x-auto lg:overflow-visible scrollbar-hide">
               {/* Mobile Filter Button */}
               <GlassButton
                 variant="default"
@@ -595,9 +595,9 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = ({
               </GlassButton>
 
               {/* Desktop Filter Pills */}
-              <div className="hidden lg:flex items-center gap-2 flex-nowrap overflow-visible">
+              <div className="hidden lg:flex items-center gap-2 flex-nowrap">
                 {/* Price Filter Dropdown */}
-                <div className="relative group overflow-visible">
+                <div className="relative group">
                   <button
                     className={cn(
                       'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium',
@@ -689,7 +689,7 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = ({
                 </div>
 
                 {/* Rating Filter Dropdown */}
-                <div className="relative group overflow-visible">
+                <div className="relative group">
                   <button
                     className={cn(
                       'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium',
@@ -755,7 +755,7 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = ({
                 </div>
 
                 {/* Availability Filter Dropdown */}
-                <div className="relative group overflow-visible">
+                <div className="relative group">
                   <button
                     className={cn(
                       'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium',
@@ -836,7 +836,7 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = ({
 
                 {/* Radius Filter (only when location is set) */}
                 {locationText && (
-                  <div className="relative group overflow-visible">
+                  <div className="relative group">
                     <button
                       className={cn(
                         'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium',
