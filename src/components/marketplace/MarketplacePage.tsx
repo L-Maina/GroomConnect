@@ -600,195 +600,199 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = ({
               {/* Desktop Filter Pills - Simple inline filters */}
               <div className="hidden lg:flex items-center gap-2">
                 {/* Price Filter - Simple pill */}
-                <button
-                  onClick={() => setOpenDropdown(openDropdown === 'price' ? null : 'price')}
-                  className={cn(
-                    'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm',
-                    'border transition-all',
-                    (minPrice || maxPrice)
-                      ? 'gradient-bg text-white border-transparent'
-                      : 'bg-background/50 border-border hover:border-primary/50'
-                  )}
-                >
-                  <DollarSign className="h-3.5 w-3.5" />
-                  {(minPrice || maxPrice) ? `$${minPrice || 0}-${maxPrice || '∞'}` : 'Price'}
-                </button>
-
-                {/* Rating Filter - Simple pill */}
-                <button
-                  onClick={() => setOpenDropdown(openDropdown === 'rating' ? null : 'rating')}
-                  className={cn(
-                    'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm',
-                    'border transition-all',
-                    minRating > 0
-                      ? 'gradient-bg text-white border-transparent'
-                      : 'bg-background/50 border-border hover:border-primary/50'
-                  )}
-                >
-                  <Star className="h-3.5 w-3.5" />
-                  {minRating > 0 ? `${minRating}+ Stars` : 'Rating'}
-                </button>
-
-                {/* Availability Filter - Simple pill */}
-                <button
-                  onClick={() => setOpenDropdown(openDropdown === 'availability' ? null : 'availability')}
-                  className={cn(
-                    'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm',
-                    'border transition-all',
-                    (availableNow || availableToday)
-                      ? 'gradient-bg text-white border-transparent'
-                      : 'bg-background/50 border-border hover:border-primary/50'
-                  )}
-                >
-                  <Clock className="h-3.5 w-3.5" />
-                  {availableNow ? 'Open Now' : availableToday ? 'Open Today' : 'Hours'}
-                </button>
-
-                {/* Radius Filter (only when location is set) */}
-                {locationText && (
+                <div className="relative">
                   <button
-                    onClick={() => setOpenDropdown(openDropdown === 'radius' ? null : 'radius')}
+                    onClick={() => setOpenDropdown(openDropdown === 'price' ? null : 'price')}
                     className={cn(
                       'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm',
                       'border transition-all',
-                      'bg-background/50 border-border hover:border-primary/50'
+                      (minPrice || maxPrice)
+                        ? 'gradient-bg text-white border-transparent'
+                        : 'bg-background/50 border-border hover:border-primary/50'
                     )}
                   >
-                    <MapPin className="h-3.5 w-3.5" />
-                    {radius}km
+                    <DollarSign className="h-3.5 w-3.5" />
+                    {(minPrice || maxPrice) ? `$${minPrice || 0}-${maxPrice || '∞'}` : 'Price'}
                   </button>
+                  
+                  {openDropdown === 'price' && (
+                    <div className="absolute top-full left-0 mt-2 w-72 glass-modal rounded-xl p-4 z-50 shadow-xl">
+                      <div className="space-y-3">
+                        <div className="flex gap-3">
+                          <div className="flex-1">
+                            <label className="text-xs text-muted-foreground mb-1 block">Min</label>
+                            <input
+                              type="number"
+                              value={minPrice}
+                              onChange={(e) => setMinPrice(e.target.value)}
+                              placeholder="0"
+                              className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <label className="text-xs text-muted-foreground mb-1 block">Max</label>
+                            <input
+                              type="number"
+                              value={maxPrice}
+                              onChange={(e) => setMaxPrice(e.target.value)}
+                              placeholder="500+"
+                              className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          {['0-50', '50-100', '100-200', '200+'].map((range) => (
+                            <button
+                              key={range}
+                              onClick={() => {
+                                const parts = range.split('-');
+                                setMinPrice(parts[0] === '0' ? '' : parts[0]);
+                                setMaxPrice(parts[1] || '');
+                              }}
+                              className="px-2 py-1 text-xs rounded bg-muted/50 hover:bg-muted"
+                            >
+                              {range}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Rating Filter - Simple pill */}
+                <div className="relative">
+                  <button
+                    onClick={() => setOpenDropdown(openDropdown === 'rating' ? null : 'rating')}
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm',
+                      'border transition-all',
+                      minRating > 0
+                        ? 'gradient-bg text-white border-transparent'
+                        : 'bg-background/50 border-border hover:border-primary/50'
+                    )}
+                  >
+                    <Star className="h-3.5 w-3.5" />
+                    {minRating > 0 ? `${minRating}+ Stars` : 'Rating'}
+                  </button>
+                  
+                  {openDropdown === 'rating' && (
+                    <div className="absolute top-full left-0 mt-2 w-48 glass-modal rounded-xl p-2 z-50 shadow-xl">
+                      {[0, 3, 3.5, 4, 4.5].map((rating) => (
+                        <button
+                          key={rating}
+                          onClick={() => {
+                            setMinRating(rating);
+                            setOpenDropdown(null);
+                          }}
+                          className={cn(
+                            'flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-left',
+                            minRating === rating ? 'bg-primary/10 text-primary' : 'hover:bg-muted/50'
+                          )}
+                        >
+                          {rating === 0 ? 'Any Rating' : `${rating}+ Stars`}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Availability Filter - Simple pill */}
+                <div className="relative">
+                  <button
+                    onClick={() => setOpenDropdown(openDropdown === 'availability' ? null : 'availability')}
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm',
+                      'border transition-all',
+                      (availableNow || availableToday)
+                        ? 'gradient-bg text-white border-transparent'
+                        : 'bg-background/50 border-border hover:border-primary/50'
+                    )}
+                  >
+                    <Clock className="h-3.5 w-3.5" />
+                    {availableNow ? 'Open Now' : availableToday ? 'Open Today' : 'Hours'}
+                  </button>
+                  
+                  {openDropdown === 'availability' && (
+                    <div className="absolute top-full left-0 mt-2 w-56 glass-modal rounded-xl p-3 z-50 shadow-xl">
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => {
+                            setAvailableNow(!availableNow);
+                            setOpenDropdown(null);
+                          }}
+                          className={cn(
+                            'flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-left',
+                            availableNow ? 'bg-primary/10 text-primary' : 'hover:bg-muted/50'
+                          )}
+                        >
+                          <Clock className="h-4 w-4" />
+                          Open Now
+                        </button>
+                        <button
+                          onClick={() => {
+                            setAvailableToday(!availableToday);
+                            setOpenDropdown(null);
+                          }}
+                          className={cn(
+                            'flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-left',
+                            availableToday ? 'bg-primary/10 text-primary' : 'hover:bg-muted/50'
+                          )}
+                        >
+                          <Calendar className="h-4 w-4" />
+                          Open Today
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Radius Filter (only when location is set) */}
+                {locationText && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setOpenDropdown(openDropdown === 'radius' ? null : 'radius')}
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm',
+                        'border transition-all',
+                        'bg-background/50 border-border hover:border-primary/50'
+                      )}
+                    >
+                      <MapPin className="h-3.5 w-3.5" />
+                      {radius}km
+                    </button>
+                    
+                    {openDropdown === 'radius' && (
+                      <div className="absolute top-full left-0 mt-2 w-56 glass-modal rounded-xl p-3 z-50 shadow-xl">
+                        <label className="text-xs text-muted-foreground mb-2 block">
+                          Search radius: {radius} km
+                        </label>
+                        <input
+                          type="range"
+                          min="5"
+                          max="50"
+                          step="5"
+                          value={radius}
+                          onChange={(e) => setRadius(parseInt(e.target.value))}
+                          className="w-full accent-primary"
+                        />
+                        <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                          <span>5km</span>
+                          <span>50km</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* Dropdown Panels - Rendered outside flow */}
+            {/* Backdrop for closing dropdowns */}
             {openDropdown && (
               <div 
                 className="fixed inset-0 z-40" 
                 onClick={() => setOpenDropdown(null)}
               />
-            )}
-            
-            {/* Price Dropdown Panel */}
-            {openDropdown === 'price' && (
-              <div className="absolute top-full left-0 mt-2 w-72 glass-modal rounded-xl p-4 z-50 shadow-xl">
-                <div className="space-y-3">
-                  <div className="flex gap-3">
-                    <div className="flex-1">
-                      <label className="text-xs text-muted-foreground mb-1 block">Min</label>
-                      <input
-                        type="number"
-                        value={minPrice}
-                        onChange={(e) => setMinPrice(e.target.value)}
-                        placeholder="0"
-                        className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label className="text-xs text-muted-foreground mb-1 block">Max</label>
-                      <input
-                        type="number"
-                        value={maxPrice}
-                        onChange={(e) => setMaxPrice(e.target.value)}
-                        placeholder="500+"
-                        className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    {['0-50', '50-100', '100-200', '200+'].map((range) => (
-                      <button
-                        key={range}
-                        onClick={() => {
-                          const parts = range.split('-');
-                          setMinPrice(parts[0] === '0' ? '' : parts[0]);
-                          setMaxPrice(parts[1] || '');
-                        }}
-                        className="px-2 py-1 text-xs rounded bg-muted/50 hover:bg-muted"
-                      >
-                        {range}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Rating Dropdown Panel */}
-            {openDropdown === 'rating' && (
-              <div className="absolute top-full left-0 mt-2 w-48 glass-modal rounded-xl p-2 z-50 shadow-xl">
-                {[0, 3, 3.5, 4, 4.5].map((rating) => (
-                  <button
-                    key={rating}
-                    onClick={() => {
-                      setMinRating(rating);
-                      setOpenDropdown(null);
-                    }}
-                    className={cn(
-                      'flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-left',
-                      minRating === rating ? 'bg-primary/10 text-primary' : 'hover:bg-muted/50'
-                    )}
-                  >
-                    {rating === 0 ? 'Any Rating' : `${rating}+ Stars`}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Availability Dropdown Panel */}
-            {openDropdown === 'availability' && (
-              <div className="absolute top-full left-0 mt-2 w-56 glass-modal rounded-xl p-3 z-50 shadow-xl">
-                <div className="space-y-2">
-                  <button
-                    onClick={() => {
-                      setAvailableNow(!availableNow);
-                      setOpenDropdown(null);
-                    }}
-                    className={cn(
-                      'flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-left',
-                      availableNow ? 'bg-primary/10 text-primary' : 'hover:bg-muted/50'
-                    )}
-                  >
-                    <Clock className="h-4 w-4" />
-                    Open Now
-                  </button>
-                  <button
-                    onClick={() => {
-                      setAvailableToday(!availableToday);
-                      setOpenDropdown(null);
-                    }}
-                    className={cn(
-                      'flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-left',
-                      availableToday ? 'bg-primary/10 text-primary' : 'hover:bg-muted/50'
-                    )}
-                  >
-                    <Calendar className="h-4 w-4" />
-                    Open Today
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Radius Dropdown Panel */}
-            {openDropdown === 'radius' && (
-              <div className="absolute top-full left-0 mt-2 w-56 glass-modal rounded-xl p-3 z-50 shadow-xl">
-                <label className="text-xs text-muted-foreground mb-2 block">
-                  Search radius: {radius} km
-                </label>
-                <input
-                  type="range"
-                  min="5"
-                  max="50"
-                  step="5"
-                  value={radius}
-                  onChange={(e) => setRadius(parseInt(e.target.value))}
-                  className="w-full accent-primary"
-                />
-                <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                  <span>5km</span>
-                  <span>50km</span>
-                </div>
-              </div>
             )}
 
             {/* Right: Sort & View */}
