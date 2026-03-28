@@ -618,7 +618,7 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = ({
                   </button>
                   
                   {/* Price Dropdown Content */}
-                  <div className="absolute top-full left-0 mt-2 w-72 glass-modal rounded-xl p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 shadow-xl">
+                  <div className="absolute top-full left-0 mt-2 w-72 glass-modal rounded-xl p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible pointer-events-none group-hover:pointer-events-auto transition-all duration-200 z-50 shadow-xl">
                     <div className="space-y-4">
                       {/* Price Inputs */}
                       <div className="flex gap-3">
@@ -708,7 +708,7 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = ({
                   </button>
                   
                   {/* Rating Dropdown Content */}
-                  <div className="absolute top-full left-0 mt-2 w-64 glass-modal rounded-xl p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 shadow-xl">
+                  <div className="absolute top-full left-0 mt-2 w-64 glass-modal rounded-xl p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible pointer-events-none group-hover:pointer-events-auto transition-all duration-200 z-50 shadow-xl">
                     {/* Star Rating Selector */}
                     <div className="mb-4">
                       <label className="text-xs text-muted-foreground mb-2 block">Select minimum rating</label>
@@ -771,7 +771,7 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = ({
                   </button>
                   
                   {/* Availability Dropdown Content */}
-                  <div className="absolute top-full left-0 mt-2 w-64 glass-modal rounded-xl p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 shadow-xl">
+                  <div className="absolute top-full left-0 mt-2 w-64 glass-modal rounded-xl p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible pointer-events-none group-hover:pointer-events-auto transition-all duration-200 z-50 shadow-xl">
                     <div className="space-y-3">
                       {/* Available Now */}
                       <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-muted/50">
@@ -851,7 +851,7 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = ({
                     </button>
                     
                     {/* Radius Dropdown */}
-                    <div className="absolute top-full left-0 mt-2 w-72 glass-modal rounded-xl p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 shadow-xl">
+                    <div className="absolute top-full left-0 mt-2 w-72 glass-modal rounded-xl p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible pointer-events-none group-hover:pointer-events-auto transition-all duration-200 z-50 shadow-xl">
                       <label className="text-xs text-muted-foreground mb-2 block">
                         Search radius: {radius} km
                       </label>
