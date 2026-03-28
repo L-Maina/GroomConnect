@@ -576,7 +576,7 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = ({
 
         {/* Filter Bar */}
         <FadeIn delay={0.15}>
-          <div className="flex items-center gap-3 mb-6">
+          <div className="flex items-center gap-3 mb-4">
             {/* Left: Filter Buttons */}
             <div className="flex items-center gap-2 flex-1 flex-nowrap overflow-x-auto scrollbar-hide pb-1">
               {/* Mobile Filter Button */}
@@ -949,7 +949,7 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = ({
         {/* Active Filter Tags */}
         {activeFilterTags.length > 0 && (
           <FadeIn delay={0.2}>
-            <div className="flex flex-wrap items-center gap-2 mb-6">
+            <div className="flex flex-wrap items-center gap-2 mb-3">
               {activeFilterTags.map((tag) => (
                 <GlassBadge
                   key={tag.type}
@@ -977,7 +977,7 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = ({
 
         {/* Results Count */}
         <FadeIn delay={0.2}>
-          <div className="mb-6">
+          <div className="mb-4">
             <p className="text-muted-foreground">
               Showing{' '}
               <span className="font-semibold text-foreground">{filteredBusinesses.length}</span>
